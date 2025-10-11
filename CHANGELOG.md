@@ -1,5 +1,11 @@
 # @ai-sdk/adaptive
 
+## 1.4.2
+
+### Patch Changes
+
+- ff06010: feat: change provider options for new model router cache keys
+
 ## 1.4.1
 
 ### Patch Changes
