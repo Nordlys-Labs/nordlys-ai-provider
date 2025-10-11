@@ -2,9 +2,9 @@
 
 import { z } from 'zod/v4';
 
-const adaptiveSemanticCacheOptions = z.object({
+const adaptiveCacheOptions = z.object({
   enabled: z.boolean().optional(),
-  semantic_threshold: z.number().optional(),
+  threshold: z.number().optional(),
 });
 
 const modelSchema = z.object({
@@ -24,6 +24,7 @@ const modelRouterConfigSchema = z.object({
   cost_bias: z.number().optional(),
   complexity_threshold: z.number().optional(),
   token_threshold: z.number().optional(),
+  cache: adaptiveCacheOptions.optional(),
 });
 
 const providerConfigSchema = z.object({
@@ -34,19 +35,9 @@ const providerConfigSchema = z.object({
   timeout_ms: z.number().optional(),
 });
 
-const promptCacheConfigSchema = z.object({
-  enabled: z.boolean(),
-  ttl: z.number(), // TTL in seconds
-});
-
 const fallbackConfigSchema = z.object({
   enabled: z.boolean().optional(),
   mode: z.enum(['sequential', 'parallel']).optional(),
-});
-
-const promptResponseCacheConfigSchema = z.object({
-  enabled: z.boolean().optional(),
-  ttl: z.number().optional(),
 });
 
 /**
@@ -78,21 +69,9 @@ export const adaptiveProviderOptions = z.object({
    */
   fallback: fallbackConfigSchema.optional(),
   /**
-   * Semantic caching configuration.
-   */
-  prompt_response_cache: promptResponseCacheConfigSchema.optional(),
-  /**
-   * Ultra-fast caching configuration.
-   */
-  prompt_cache: promptCacheConfigSchema.optional(),
-  /**
    * Custom provider configurations.
    */
   provider_configs: z.record(z.string(), providerConfigSchema).optional(),
-  /**
-   * Semantic cache configuration (legacy).
-   */
-  semantic_cache: adaptiveSemanticCacheOptions.optional(),
 });
 
 /**

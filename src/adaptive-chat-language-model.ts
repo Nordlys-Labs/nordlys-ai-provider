@@ -284,17 +284,8 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
       ...(adaptiveOptions.fallback
         ? { fallback: adaptiveOptions.fallback }
         : {}),
-      ...(adaptiveOptions.prompt_response_cache
-        ? { prompt_response_cache: adaptiveOptions.prompt_response_cache }
-        : {}),
-      ...(adaptiveOptions.prompt_cache
-        ? { prompt_cache: adaptiveOptions.prompt_cache }
-        : {}),
       ...(adaptiveOptions.provider_configs
         ? { provider_configs: adaptiveOptions.provider_configs }
-        : {}),
-      ...(adaptiveOptions.semantic_cache
-        ? { semantic_cache: adaptiveOptions.semantic_cache }
         : {}),
     };
 

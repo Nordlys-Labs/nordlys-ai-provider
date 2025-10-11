@@ -15,10 +15,7 @@ export interface AdaptiveChatCompletionRequest {
   user?: string;
   model_router?: AdaptiveModelRouterConfig;
   fallback?: AdaptiveFallbackConfig;
-  prompt_response_cache?: AdaptivePromptResponseCacheConfig;
-  prompt_cache?: AdaptivePromptCacheConfig;
   provider_configs?: Record<string, AdaptiveProviderConfig>;
-  semantic_cache?: AdaptiveSemanticCacheConfig;
   stream_options?: {
     include_usage?: boolean;
   };
@@ -142,6 +139,7 @@ export interface AdaptiveModelRouterConfig {
   cost_bias?: number;
   complexity_threshold?: number;
   token_threshold?: number;
+  cache?: AdaptiveCacheConfig;
 }
 
 /**
@@ -150,22 +148,6 @@ export interface AdaptiveModelRouterConfig {
 export interface AdaptiveFallbackConfig {
   enabled?: boolean;
   mode?: 'sequential' | 'parallel';
-}
-
-/**
- * Prompt response cache configuration.
- */
-export interface AdaptivePromptResponseCacheConfig {
-  enabled?: boolean;
-  ttl?: number;
-}
-
-/**
- * Prompt cache configuration.
- */
-export interface AdaptivePromptCacheConfig {
-  enabled: boolean;
-  ttl: number;
 }
 
 /**
@@ -180,11 +162,11 @@ export interface AdaptiveProviderConfig {
 }
 
 /**
- * Semantic cache configuration.
+ * Cache configuration.
  */
-export interface AdaptiveSemanticCacheConfig {
+export interface AdaptiveCacheConfig {
   enabled?: boolean;
-  semantic_threshold?: number;
+  threshold?: number;
 }
 
 /**
