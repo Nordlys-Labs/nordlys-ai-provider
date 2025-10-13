@@ -1,5 +1,11 @@
 # @ai-sdk/adaptive
 
+## 1.4.3
+
+### Patch Changes
+
+- 1a0a07b: chore: update deps
+
 ## 1.4.2
 
 ### Patch Changes
