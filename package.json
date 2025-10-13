@@ -11,23 +11,23 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@ai-sdk/provider": "2.0.0-beta.1",
-    "@ai-sdk/provider-utils": "^3.0.10",
-    "zod": "^4.1.11"
+    "@ai-sdk/provider": "2.0.0",
+    "@ai-sdk/provider-utils": "^3.0.12",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.4",
+    "@biomejs/biome": "^2.2.6",
     "@changesets/cli": "^2.29.7",
-    "@commitlint/cli": "^19.8.1",
-    "@commitlint/config-conventional": "^19.8.1",
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
     "@edge-runtime/vm": "^5.0.0",
-    "@types/node": "^24.5.2",
+    "@types/node": "^24.7.2",
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
     "husky": "^9.1.7",
     "prettier": "3.6.2",
     "tsup": "^8.5.0",
-    "typescript": "^5.9.2",
+    "typescript": "^5.9.3",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.4"
   },
@@ -70,9 +70,9 @@
     "test:edge": "vitest --config vitest.edge.config.js --run",
     "test:node": "vitest --config vitest.node.config.js --run",
     "test:coverage": "vitest --config vitest.node.config.js --coverage",
-    "prepublishOnly": "bun run build && bun run test && bun run lint && bun run type-check",
+    "prepublishOnly": "bun run build && bun run test && bun run lint && bun run typecheck",
     "dev": "bun run build:watch",
-    "ci": "bun run lint && bun run type-check && bun run test",
+    "ci": "bun run lint && bun run typecheck && bun run test",
     "changeset": "changeset",
     "version": "changeset version && bun run build",
     "release": "changeset publish"
