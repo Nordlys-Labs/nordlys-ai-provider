@@ -1,11 +1,11 @@
 # Nordlys AI Provider
 
-Intelligent AI provider for [Vercel AI SDK v5](https://ai-sdk.dev/docs) with automatic model selection and V2 specification compliance.
+Intelligent AI provider for [Vercel AI SDK v5](https://ai-sdk.dev/docs) with automatic model selection and V3 specification compliance.
 
 ## Features
 
 - 🤖 **Intelligent Model Selection** - Automatically picks optimal models
-- 🧠 **V2 Spec Compliant** - Reasoning, file generation, enhanced usage tracking
+- 🧠 **V3 Spec Compliant** - Reasoning, file generation, enhanced usage tracking
 - 🔄 **Multi-Provider** - OpenAI, Anthropic, Google, DeepSeek, Groq, etc.
 - 🚀 **Production Ready** - TypeScript, full test coverage
 
@@ -29,7 +29,7 @@ const { text } = await generateText({
 });
 ```
 
-## V2 Content Types
+## V3 Content Types
 
 ```ts
 const { content, usage } = await generateText({
