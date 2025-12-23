@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { adaptive, createAdaptive } from './adaptive-provider';
+import { createNordlys, nordlys } from './nordlys-provider';
 
-describe('adaptiveProvider', () => {
+describe('nordlysProvider', () => {
   it('should create a provider instance', () => {
-    const provider = createAdaptive({
+    const provider = createNordlys({
       apiKey: 'test-key',
       baseURL: 'https://example.com',
     });
@@ -14,37 +14,37 @@ describe('adaptiveProvider', () => {
   });
 
   it('should create a chat model', () => {
-    const provider = createAdaptive({
+    const provider = createNordlys({
       apiKey: 'test-key',
       baseURL: 'https://example.com',
     });
     const model = provider.chat();
     expect(model).toBeDefined();
     expect(model.modelId).toBe('');
-    expect(model.provider).toBe('adaptive.chat');
+    expect(model.provider).toBe('nordlys.chat');
   });
 
   it('should create a language model', () => {
-    const provider = createAdaptive({
+    const provider = createNordlys({
       apiKey: 'test-key',
       baseURL: 'https://example.com',
     });
     const model = provider.languageModel();
     expect(model).toBeDefined();
     expect(model.modelId).toBe('');
-    expect(model.provider).toBe('adaptive.chat');
+    expect(model.provider).toBe('nordlys.chat');
   });
 
-  it('should throw for textEmbeddingModel', () => {
-    const provider = createAdaptive({
+  it('should throw for embeddingModel', () => {
+    const provider = createNordlys({
       apiKey: 'test-key',
       baseURL: 'https://example.com',
     });
-    expect(() => provider.textEmbeddingModel('embed-model')).toThrow();
+    expect(() => provider.embeddingModel('embed-model')).toThrow();
   });
 
   it('should throw for imageModel', () => {
-    const provider = createAdaptive({
+    const provider = createNordlys({
       apiKey: 'test-key',
       baseURL: 'https://example.com',
     });
@@ -52,8 +52,8 @@ describe('adaptiveProvider', () => {
   });
 
   it('should provide a default instance', () => {
-    expect(typeof adaptive).toBe('function');
-    expect(adaptive.languageModel).toBeInstanceOf(Function);
-    expect(adaptive.chat).toBeInstanceOf(Function);
+    expect(typeof nordlys).toBe('function');
+    expect(nordlys.languageModel).toBeInstanceOf(Function);
+    expect(nordlys.chat).toBeInstanceOf(Function);
   });
 });

@@ -1,14 +1,14 @@
-// Converts generic chat messages to Adaptive API format
+// Converts generic chat messages to Nordlys API format
 import type {
-  LanguageModelV2CallWarning,
-  LanguageModelV2Prompt,
-  LanguageModelV2ToolResultOutput,
+  LanguageModelV3CallWarning,
+  LanguageModelV3Prompt,
+  LanguageModelV3ToolResultPart,
 } from '@ai-sdk/provider';
 import { UnsupportedFunctionalityError } from '@ai-sdk/provider';
 import { convertToBase64 } from '@ai-sdk/provider-utils';
-import type { AdaptiveChatCompletionMessage } from './adaptive-types';
+import type { NordlysChatCompletionMessage } from './nordlys-types';
 
-function convertToolOutput(output: LanguageModelV2ToolResultOutput): string {
+function convertToolOutput(output: LanguageModelV3ToolResultPart): string {
   switch (output.type) {
     case 'text':
     case 'error-text':
@@ -22,18 +22,18 @@ function convertToolOutput(output: LanguageModelV2ToolResultOutput): string {
   }
 }
 
-export function convertToAdaptiveChatMessages({
+export function convertToNordlysChatMessages({
   prompt,
   systemMessageMode = 'system',
 }: {
-  prompt: LanguageModelV2Prompt;
+  prompt: LanguageModelV3Prompt;
   systemMessageMode?: 'system' | 'developer' | 'remove';
 }): {
-  messages: AdaptiveChatCompletionMessage[];
-  warnings: Array<LanguageModelV2CallWarning>;
+  messages: NordlysChatCompletionMessage[];
+  warnings: Array<LanguageModelV3CallWarning>;
 } {
-  const messages: AdaptiveChatCompletionMessage[] = [];
-  const warnings: Array<LanguageModelV2CallWarning> = [];
+  const messages: NordlysChatCompletionMessage[] = [];
+  const warnings: Array<LanguageModelV3CallWarning> = [];
 
   for (const { role, content } of prompt) {
     switch (role) {
@@ -191,7 +191,7 @@ export function convertToAdaptiveChatMessages({
         const text = textParts.join('');
         const reasoning = reasoningParts.join('');
 
-        const message: AdaptiveChatCompletionMessage = {
+        const message: NordlysChatCompletionMessage = {
           role: 'assistant',
           content: text,
           ...(toolCalls.length > 0 && { tool_calls: toolCalls }),

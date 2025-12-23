@@ -1,15 +1,15 @@
 import { safeParseJSON } from '@ai-sdk/provider-utils';
 import { describe, expect, it } from 'vitest';
-import { adaptiveErrorDataSchema } from './adaptive-error';
+import { nordlysErrorDataSchema } from './nordlys-error';
 
-describe('adaptiveErrorDataSchema', () => {
+describe('nordlysErrorDataSchema', () => {
   it('should parse a standard error response', async () => {
     const error = JSON.stringify({
       error: { message: 'Something went wrong', code: 400 },
     });
     const result = await safeParseJSON({
       text: error,
-      schema: adaptiveErrorDataSchema,
+      schema: nordlysErrorDataSchema,
     });
     if (!result.success) throw result.error;
     expect(result.value.error.message).toBe('Something went wrong');
@@ -20,7 +20,7 @@ describe('adaptiveErrorDataSchema', () => {
     const error = JSON.stringify({ error: { message: 'Just a message' } });
     const result = await safeParseJSON({
       text: error,
-      schema: adaptiveErrorDataSchema,
+      schema: nordlysErrorDataSchema,
     });
     if (!result.success) throw result.error;
     expect(result.value.error.message).toBe('Just a message');

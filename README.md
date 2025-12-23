@@ -1,4 +1,4 @@
-# Adaptive AI Provider
+# Nordlys AI Provider
 
 Intelligent AI provider for [Vercel AI SDK v5](https://ai-sdk.dev/docs) with automatic model selection and V2 specification compliance.
 
@@ -12,19 +12,20 @@ Intelligent AI provider for [Vercel AI SDK v5](https://ai-sdk.dev/docs) with aut
 ## Install
 
 ```bash
-npm i @adaptive-llm/adaptive-ai-provider
+npm i @nordlys-labs/nordlys-ai-provider
 ```
 
 ## Usage
 
 ```ts
-import { adaptive } from '@adaptive-llm/adaptive-ai-provider';
+import { nordlys } from '@nordlys-labs/nordlys-ai-provider';
 import { generateText } from 'ai';
 
 // Intelligent model selection
 const { text } = await generateText({
-  model: adaptive(),
+  model: nordlys(),
   prompt: 'Explain quantum computing',
+  providerOptions: { model: 'claude-opus-4-5' },
 });
 ```
 
@@ -32,8 +33,9 @@ const { text } = await generateText({
 
 ```ts
 const { content, usage } = await generateText({
-  model: adaptive(),
+  model: nordlys(),
   prompt: 'Solve: 2x + 5 = 17',
+  providerOptions: { model: 'claude-opus-4-5' },
 });
 
 // Access reasoning, files, tool calls
@@ -59,8 +61,9 @@ console.log({
 
 ```ts
 const { fullStream } = streamText({
-  model: adaptive(),
+  model: nordlys(),
   prompt: 'Count to 10',
+  providerOptions: { model: 'claude-opus-4-5' },
 });
 
 for await (const part of fullStream) {
@@ -73,8 +76,9 @@ for await (const part of fullStream) {
 
 ```ts
 const { text } = await generateText({
-  model: adaptive(),
+  model: nordlys(),
   prompt: 'What is the weather in SF?',
+  providerOptions: { model: 'claude-opus-4-5' },
   tools: {
     getWeather: {
       description: 'Get weather for location',
@@ -92,11 +96,11 @@ const { text } = await generateText({
 ## Configuration
 
 ```ts
-import { createAdaptive } from '@adaptive-llm/adaptive-ai-provider';
+import { createNordlys } from '@nordlys-labs/nordlys-ai-provider';
 
-const adaptive = createAdaptive({
+const nordlys = createNordlys({
   baseURL: 'https://your-api.com/v1',
-  apiKey: 'your-key', // or ADAPTIVE_API_KEY env var
+  apiKey: 'your-key', // or NORDLYS_API_KEY env var
   headers: { 'Custom-Header': 'value' },
 });
 ```
@@ -105,7 +109,7 @@ const adaptive = createAdaptive({
 
 ```ts
 const { text } = await generateText({
-  model: adaptive(),
+  model: nordlys(),
   messages: [{
     role: 'user',
     content: [
@@ -113,6 +117,7 @@ const { text } = await generateText({
       { type: 'file', data: 'data:image/jpeg;base64,...', media_type: 'image/jpeg' },
     ],
   }],
+  providerOptions: { model: 'claude-opus-4-5' },
 });
 ```
 
@@ -131,7 +136,11 @@ const { text } = await generateText({
 import { APICallError, TooManyRequestsError } from 'ai';
 
 try {
-  const result = await generateText({ model: adaptive(), prompt: 'Hello' });
+  const result = await generateText({
+    model: nordlys(),
+    prompt: 'Hello',
+    providerOptions: { model: 'claude-opus-4-5' },
+  });
 } catch (error) {
   if (error instanceof TooManyRequestsError) {
     console.log('Rate limited, retry after:', error.retryAfter);
@@ -142,5 +151,5 @@ try {
 ## Environment
 
 ```bash
-export ADAPTIVE_API_KEY="your-api-key"
+export NORDLYS_API_KEY="your-api-key"
 ```

@@ -1,10 +1,10 @@
 import {
   InvalidResponseDataError,
-  type LanguageModelV2,
-  type LanguageModelV2CallWarning,
-  type LanguageModelV2Content,
-  type LanguageModelV2FinishReason,
-  type LanguageModelV2Usage,
+  type LanguageModelV3,
+  type LanguageModelV3CallWarning,
+  type LanguageModelV3Content,
+  type LanguageModelV3FinishReason,
+  type LanguageModelV3Usage,
 } from '@ai-sdk/provider';
 import type { FetchFunction } from '@ai-sdk/provider-utils';
 import {
@@ -16,18 +16,18 @@ import {
   postJsonToApi,
 } from '@ai-sdk/provider-utils';
 import { z } from 'zod';
-import { adaptiveProviderOptions } from './adaptive-chat-options';
-import { adaptiveFailedResponseHandler } from './adaptive-error';
-import { prepareTools } from './adaptive-prepare-tools';
-import type {
-  AdaptiveChatCompletionMessage,
-  AdaptiveChatCompletionRequest,
-} from './adaptive-types';
-import { convertToAdaptiveChatMessages } from './convert-to-adaptive-chat-messages';
+import { convertToNordlysChatMessages } from './convert-to-nordlys-chat-messages';
 import { getResponseMetadata } from './get-response-metadata';
-import { mapAdaptiveFinishReason } from './map-adaptive-finish-reason';
+import { mapNordlysFinishReason } from './map-nordlys-finish-reason';
+import { nordlysProviderOptions } from './nordlys-chat-options';
+import { nordlysFailedResponseHandler } from './nordlys-error';
+import { prepareTools } from './nordlys-prepare-tools';
+import type {
+  NordlysChatCompletionMessage,
+  NordlysChatCompletionRequest,
+} from './nordlys-types';
 
-interface AdaptiveChatConfig {
+interface NordlysChatConfig {
   provider: string;
   baseURL: string;
   headers: () => Record<string, string | undefined>;
@@ -35,7 +35,7 @@ interface AdaptiveChatConfig {
   defaultProvider?: string;
 }
 
-const adaptiveChatResponseSchema = z.object({
+const nordlysChatResponseSchema = z.object({
   id: z.string().nullish(),
   created: z.number().nullish(),
   model: z.string().nullish(),
@@ -100,6 +100,7 @@ const adaptiveChatResponseSchema = z.object({
     })
     .optional(),
   system_fingerprint: z.string().optional(),
+  service_tier: z.string().optional(),
   provider: z.string().optional(),
   error: z
     .object({
@@ -111,7 +112,7 @@ const adaptiveChatResponseSchema = z.object({
     .optional(),
 });
 
-const adaptiveChatChunkSchema = z.union([
+const nordlysChatChunkSchema = z.union([
   z.object({
     id: z.string().nullish(),
     created: z.number().nullish(),
@@ -180,6 +181,8 @@ const adaptiveChatChunkSchema = z.union([
       })
       .optional(),
     provider: z.string().optional(),
+    service_tier: z.string().optional(),
+    system_fingerprint: z.string().optional(),
   }),
   z.object({
     error: z.object({
@@ -192,12 +195,12 @@ const adaptiveChatChunkSchema = z.union([
   }),
 ]);
 
-export class AdaptiveChatLanguageModel implements LanguageModelV2 {
-  readonly specificationVersion = 'v2';
+export class NordlysChatLanguageModel implements LanguageModelV3 {
+  readonly specificationVersion = 'v3';
   readonly modelId: string;
-  private readonly config: AdaptiveChatConfig;
+  private readonly config: NordlysChatConfig;
 
-  constructor(modelId: string, config: AdaptiveChatConfig) {
+  constructor(modelId: string, config: NordlysChatConfig) {
     this.modelId = modelId;
     this.config = config;
   }
@@ -220,12 +223,11 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
     presencePenalty,
     stopSequences,
     responseFormat,
-    seed,
     providerOptions,
     tools,
     toolChoice,
-  }: Parameters<LanguageModelV2['doGenerate']>[0]) {
-    const warnings: LanguageModelV2CallWarning[] = [];
+  }: Parameters<LanguageModelV3['doGenerate']>[0]) {
+    const warnings: LanguageModelV3CallWarning[] = [];
 
     // Warn for unsupported settings
     if (topK != null) {
@@ -235,16 +237,20 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
       warnings.push({ type: 'unsupported-setting', setting: 'responseFormat' });
     }
 
-    if (seed != null) {
-      warnings.push({ type: 'unsupported-setting', setting: 'seed' });
-    }
     // Parse provider options with zod schema (flat, not nested)
-    const result = adaptiveProviderOptions.safeParse(providerOptions ?? {});
-    const adaptiveOptions = result.success ? result.data : {};
+    const result = nordlysProviderOptions.safeParse(providerOptions ?? {});
+    const nordlysOptions = result.success ? result.data : {};
+
+    // Model is required - use from providerOptions or throw error
+    if (!nordlysOptions.model) {
+      throw new Error(
+        'Model is required. Please provide a model in providerOptions.'
+      );
+    }
 
     const {
-      tools: adaptiveTools,
-      toolChoice: adaptiveToolChoice,
+      tools: nordlysTools,
+      toolChoice: nordlysToolChoice,
       toolWarnings,
     } = prepareTools({
       tools,
@@ -254,38 +260,66 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
 
     // Convert messages
     const { messages, warnings: messageWarnings } =
-      convertToAdaptiveChatMessages({ prompt });
+      convertToNordlysChatMessages({ prompt });
     warnings.push(...messageWarnings);
 
-    // Standardized settings for intelligent model selection
+    // Standardized settings
     const standardizedArgs = {
-      messages: messages as AdaptiveChatCompletionMessage[],
+      messages: messages as NordlysChatCompletionMessage[],
+      model: nordlysOptions.model,
       max_tokens:
         typeof maxOutputTokens === 'number' ? maxOutputTokens : undefined,
+      max_completion_tokens: nordlysOptions.max_completion_tokens,
       temperature,
       top_p: topP,
       stop: stopSequences,
       presence_penalty: presencePenalty,
       frequency_penalty: frequencyPenalty,
-      user: adaptiveOptions.user,
-      tools: adaptiveTools,
-      tool_choice: adaptiveToolChoice,
+      user: nordlysOptions.user,
+      tools: nordlysTools,
+      tool_choice: nordlysToolChoice,
     };
 
-    // logit_bias
-    const logitBias = adaptiveOptions.logit_bias;
-
-    const args: AdaptiveChatCompletionRequest = {
+    // Map new provider option fields
+    const args: NordlysChatCompletionRequest = {
       ...standardizedArgs,
-      ...(logitBias ? { logit_bias: logitBias } : {}),
-      ...(adaptiveOptions.model_router
-        ? { model_router: adaptiveOptions.model_router }
+      ...(nordlysOptions.logit_bias
+        ? { logit_bias: nordlysOptions.logit_bias }
         : {}),
-      ...(adaptiveOptions.fallback
-        ? { fallback: adaptiveOptions.fallback }
+      ...(nordlysOptions.audio ? { audio: nordlysOptions.audio } : {}),
+      ...(nordlysOptions.logprobs !== undefined
+        ? { logprobs: nordlysOptions.logprobs }
         : {}),
-      ...(adaptiveOptions.provider_configs
-        ? { provider_configs: adaptiveOptions.provider_configs }
+      ...(nordlysOptions.metadata ? { metadata: nordlysOptions.metadata } : {}),
+      ...(nordlysOptions.modalities
+        ? { modalities: nordlysOptions.modalities }
+        : {}),
+      ...(nordlysOptions.parallel_tool_calls !== undefined
+        ? { parallel_tool_calls: nordlysOptions.parallel_tool_calls }
+        : {}),
+      ...(nordlysOptions.prediction
+        ? { prediction: nordlysOptions.prediction }
+        : {}),
+      ...(nordlysOptions.reasoning_effort
+        ? { reasoning_effort: nordlysOptions.reasoning_effort }
+        : {}),
+      ...(nordlysOptions.response_format
+        ? { response_format: nordlysOptions.response_format }
+        : {}),
+      ...(nordlysOptions.seed !== undefined
+        ? { seed: nordlysOptions.seed }
+        : {}),
+      ...(nordlysOptions.service_tier
+        ? { service_tier: nordlysOptions.service_tier }
+        : {}),
+      ...(nordlysOptions.store !== undefined
+        ? { store: nordlysOptions.store }
+        : {}),
+      ...(nordlysOptions.top_logprobs !== undefined
+        ? { top_logprobs: nordlysOptions.top_logprobs }
+        : {}),
+      ...(nordlysOptions.web_search_options
+        ? { web_search_options: nordlysOptions.web_search_options }
         : {}),
     };
 
@@ -296,37 +330,37 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
   }
 
   async doGenerate(
-    options: Parameters<LanguageModelV2['doGenerate']>[0]
-  ): Promise<Awaited<ReturnType<LanguageModelV2['doGenerate']>>> {
+    options: Parameters<LanguageModelV3['doGenerate']>[0]
+  ): Promise<Awaited<ReturnType<LanguageModelV3['doGenerate']>>> {
     const { args: body, warnings } = await this.getArgs(options);
 
     const { responseHeaders, value, rawValue } = await postJsonToApi({
       url: `${this.config.baseURL}/chat/completions`,
       headers: combineHeaders(this.config.headers(), options.headers),
       body,
-      failedResponseHandler: adaptiveFailedResponseHandler,
+      failedResponseHandler: nordlysFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
-        adaptiveChatResponseSchema
+        nordlysChatResponseSchema
       ),
       abortSignal: options.abortSignal,
       fetch: this.config.fetch,
     });
 
     if (!value) {
-      throw new Error('Failed to parse Adaptive API response');
+      throw new Error('Failed to parse Nordlys API response');
     }
 
     // Handle error responses
     if (value.error) {
-      throw new Error(`Adaptive API Error: ${value.error.message}`);
+      throw new Error(`Nordlys API Error: ${value.error.message}`);
     }
 
     if (!value.choices || value.choices.length === 0) {
-      throw new Error('No choices returned from Adaptive API');
+      throw new Error('No choices returned from Nordlys API');
     }
 
     const choice = value.choices[0];
-    const content: Array<LanguageModelV2Content> = [];
+    const content: Array<LanguageModelV3Content> = [];
 
     if (choice.message?.content) {
       content.push({ type: 'text', text: choice.message.content });
@@ -375,7 +409,7 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
     return {
       content,
       finishReason: choice.finish_reason
-        ? mapAdaptiveFinishReason(choice.finish_reason)
+        ? mapNordlysFinishReason(choice.finish_reason)
         : 'stop',
       usage: value.usage
         ? {
@@ -388,8 +422,10 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
         : { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       providerMetadata: value.provider
         ? {
-            adaptive: {
+            nordlys: {
               provider: value.provider,
+              service_tier: value.service_tier,
+              system_fingerprint: value.system_fingerprint,
             },
           }
         : undefined,
@@ -406,8 +442,8 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
   }
 
   async doStream(
-    options: Parameters<LanguageModelV2['doStream']>[0]
-  ): Promise<Awaited<ReturnType<LanguageModelV2['doStream']>>> {
+    options: Parameters<LanguageModelV3['doStream']>[0]
+  ): Promise<Awaited<ReturnType<LanguageModelV3['doStream']>>> {
     const { args, warnings } = await this.getArgs(options);
     const body = {
       ...args,
@@ -419,9 +455,9 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
       url: `${this.config.baseURL}/chat/completions`,
       headers: combineHeaders(this.config.headers(), options.headers),
       body,
-      failedResponseHandler: adaptiveFailedResponseHandler,
+      failedResponseHandler: nordlysFailedResponseHandler,
       successfulResponseHandler: createEventSourceResponseHandler(
-        adaptiveChatChunkSchema
+        nordlysChatChunkSchema
       ),
       abortSignal: options.abortSignal,
       fetch: this.config.fetch,
@@ -438,17 +474,19 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
     }> = [];
 
     const state = {
-      finishReason: 'unknown' as LanguageModelV2FinishReason,
+      finishReason: 'unknown' as LanguageModelV3FinishReason,
       usage: {
         inputTokens: undefined as number | undefined,
         outputTokens: undefined as number | undefined,
         totalTokens: undefined as number | undefined,
         reasoningTokens: undefined as number | undefined,
         cachedInputTokens: undefined as number | undefined,
-      } as LanguageModelV2Usage,
+      } as LanguageModelV3Usage,
       isFirstChunk: true,
       isActiveText: false,
       provider: undefined as string | undefined,
+      serviceTier: undefined as string | undefined,
+      systemFingerprint: undefined as string | undefined,
     };
 
     return {
@@ -504,11 +542,17 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
               state.provider = value.provider;
             }
 
+            if (value.service_tier) {
+              state.serviceTier = value.service_tier;
+            }
+
+            if (value.system_fingerprint) {
+              state.systemFingerprint = value.system_fingerprint;
+            }
+
             const choice = value.choices[0];
             if (choice?.finish_reason != null) {
-              state.finishReason = mapAdaptiveFinishReason(
-                choice.finish_reason
-              );
+              state.finishReason = mapNordlysFinishReason(choice.finish_reason);
             }
 
             if (!choice?.delta) {
@@ -554,7 +598,7 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
               for (const toolCallDelta of delta.tool_calls) {
                 const index = toolCallDelta.index;
 
-                // Tool call start. Adaptive returns all information except the arguments in the first chunk.
+                // Tool call start. Nordlys returns all information except the arguments in the first chunk.
                 if (toolCalls[index] == null) {
                   if (
                     toolCallDelta.type !== 'function' &&
@@ -686,13 +730,16 @@ export class AdaptiveChatLanguageModel implements LanguageModelV2 {
                 outputTokens: 0,
                 totalTokens: 0,
               },
-              providerMetadata: state.provider
-                ? {
-                    adaptive: {
-                      provider: state.provider,
-                    },
-                  }
-                : undefined,
+              providerMetadata:
+                state.provider || state.serviceTier || state.systemFingerprint
+                  ? {
+                      nordlys: {
+                        provider: state.provider,
+                        service_tier: state.serviceTier,
+                        system_fingerprint: state.systemFingerprint,
+                      },
+                    }
+                  : undefined,
             });
           },
         })

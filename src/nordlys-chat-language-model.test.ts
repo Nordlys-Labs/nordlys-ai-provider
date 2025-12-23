@@ -1,20 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AdaptiveChatLanguageModel } from './adaptive-chat-language-model';
+import { NordlysChatLanguageModel } from './nordlys-chat-language-model';
 
-describe('adaptiveChatLanguageModel', () => {
+describe('nordlysChatLanguageModel', () => {
   it('should construct with modelId and config', () => {
-    const model = new AdaptiveChatLanguageModel('test-model', {
-      provider: 'adaptive.chat',
+    const model = new NordlysChatLanguageModel('test-model', {
+      provider: 'nordlys.chat',
       baseURL: 'https://example.com',
       headers: () => ({}),
     });
     expect(model.modelId).toBe('test-model');
-    expect(model.provider).toBe('adaptive.chat');
+    expect(model.provider).toBe('nordlys.chat');
   });
 
   it('should have doGenerate and doStream methods', () => {
-    const model = new AdaptiveChatLanguageModel('test-model', {
-      provider: 'adaptive.chat',
+    const model = new NordlysChatLanguageModel('test-model', {
+      provider: 'nordlys.chat',
       baseURL: 'https://example.com',
       headers: () => ({}),
     });
@@ -23,15 +23,15 @@ describe('adaptiveChatLanguageModel', () => {
   });
 
   it('should have correct specification version', () => {
-    const model = new AdaptiveChatLanguageModel('test-model', {
-      provider: 'adaptive.chat',
+    const model = new NordlysChatLanguageModel('test-model', {
+      provider: 'nordlys.chat',
       baseURL: 'https://example.com',
       headers: () => ({}),
     });
-    expect(model.specificationVersion).toBe('v2');
+    expect(model.specificationVersion).toBe('v3');
   });
 
-  it('should support V2 content types in responses', async () => {
+  it('should support V3 content types in responses', async () => {
     const mockResponse = {
       id: 'test-id',
       choices: [
@@ -91,8 +91,8 @@ describe('adaptiveChatLanguageModel', () => {
       clone: () => ({}) as Response,
     });
 
-    const model = new AdaptiveChatLanguageModel('', {
-      provider: 'adaptive.chat',
+    const model = new NordlysChatLanguageModel('', {
+      provider: 'nordlys.chat',
       baseURL: 'https://example.com',
       headers: () => ({}),
       fetch: mockFetch,
@@ -100,6 +100,7 @@ describe('adaptiveChatLanguageModel', () => {
 
     const result = await model.doGenerate({
       prompt: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
+      providerOptions: { model: 'test-model' },
     });
 
     expect(result.content).toHaveLength(4);
@@ -130,8 +131,8 @@ describe('adaptiveChatLanguageModel', () => {
   });
 
   it('should handle supportedUrls correctly', () => {
-    const model = new AdaptiveChatLanguageModel('test-model', {
-      provider: 'adaptive.chat',
+    const model = new NordlysChatLanguageModel('test-model', {
+      provider: 'nordlys.chat',
       baseURL: 'https://example.com',
       headers: () => ({}),
     });

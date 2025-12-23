@@ -1,4 +1,44 @@
-# @ai-sdk/adaptive
+# @nordlys-labs/nordlys-ai-provider
+
+## Unreleased
+
+### Major Changes
+
+- **BREAKING**: Renamed from `@ai-sdk/adaptive` to `@nordlys-labs/nordlys-ai-provider`
+- **BREAKING**: Renamed all `Adaptive*` types and functions to `Nordlys*`
+- **BREAKING**: Renamed `adaptive` export to `nordlys`
+- **BREAKING**: Renamed `createAdaptive` to `createNordlys`
+- **BREAKING**: Changed provider identifier from `'adaptive.chat'` to `'nordlys.chat'`
+- **BREAKING**: Changed environment variable from `ADAPTIVE_API_KEY` to `NORDLYS_API_KEY`
+- **BREAKING**: Removed deprecated `model_router`, `fallback`, and `provider_configs` fields
+- **BREAKING**: `model` field is now required in providerOptions
+
+### Added
+
+- Added support for new OpenAPI fields:
+  - `model` (required) - model name
+  - `audio` - audio parameter for chat completion
+  - `logprobs` - return log probabilities
+  - `max_completion_tokens` - maximum completion tokens
+  - `metadata` - shared metadata
+  - `modalities` - request modalities
+  - `parallel_tool_calls` - allow parallel tool calls
+  - `prediction` - prediction content parameter
+  - `reasoning_effort` - reasoning effort level
+  - `response_format` - response format parameter
+  - `seed` - seed for deterministic outputs
+  - `service_tier` - service tier to use
+  - `store` - whether to store the conversation
+  - `top_logprobs` - number of top logprobs to return
+  - `web_search_options` - web search options
+- Added `service_tier` and `system_fingerprint` to response types
+- Added TypeScript type definitions for all new OpenAPI schemas
+
+### Removed
+
+- Removed `model_router` configuration (no longer supported)
+- Removed `fallback` configuration (no longer supported)
+- Removed `provider_configs` configuration (not adding per user request)
 
 ## 1.4.3
 

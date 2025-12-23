@@ -1,8 +1,8 @@
-import type { LanguageModelV2FinishReason } from '@ai-sdk/provider';
+import type { LanguageModelV3FinishReason } from '@ai-sdk/provider';
 
-export function mapAdaptiveFinishReason(
+export function mapNordlysFinishReason(
   reason?: string
-): LanguageModelV2FinishReason {
+): LanguageModelV3FinishReason {
   switch (reason) {
     case 'stop':
       return 'stop';

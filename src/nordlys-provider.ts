@@ -1,44 +1,44 @@
 import type {
-  EmbeddingModelV2,
-  LanguageModelV2,
-  ProviderV2,
+  EmbeddingModelV3,
+  LanguageModelV3,
+  ProviderV3,
 } from '@ai-sdk/provider';
 import { NoSuchModelError } from '@ai-sdk/provider';
 import type { FetchFunction } from '@ai-sdk/provider-utils';
 import { loadApiKey, withoutTrailingSlash } from '@ai-sdk/provider-utils';
-import { AdaptiveChatLanguageModel } from './adaptive-chat-language-model';
+import { NordlysChatLanguageModel } from './nordlys-chat-language-model';
 
-export type AdaptiveChatModelId = string;
+export type NordlysChatModelId = string;
 
-export interface AdaptiveProvider extends ProviderV2 {
-  (): LanguageModelV2;
-
-  /**
-   * Creates a model for text generation with adaptive provider selection.
-   */
-  languageModel: () => LanguageModelV2;
+export interface NordlysProvider extends ProviderV3 {
+  (): LanguageModelV3;
 
   /**
-   * Creates a chat model with adaptive provider selection.
+   * Creates a model for text generation with Nordlys provider selection.
    */
-  chat: () => LanguageModelV2;
+  languageModel: () => LanguageModelV3;
 
   /**
-   * Text embedding is not currently supported by the adaptive provider.
+   * Creates a chat model with Nordlys provider selection.
    */
-  textEmbeddingModel: (modelId: string) => EmbeddingModelV2<string>;
+  chat: () => LanguageModelV3;
+
+  /**
+   * Text embedding is not currently supported by the Nordlys provider.
+   */
+  embeddingModel: (modelId: string) => EmbeddingModelV3;
 }
 
-export interface AdaptiveProviderSettings {
+export interface NordlysProviderSettings {
   /**
    * Use a different URL prefix for API calls, e.g. to use proxy servers.
-   * The default prefix is your adaptive API endpoint.
+   * The default prefix is your Nordlys API endpoint.
    */
   baseURL?: string;
 
   /**
-   * API key for the adaptive service.
-   * It defaults to the `ADAPTIVE_API_KEY` environment variable.
+   * API key for the Nordlys service.
+   * It defaults to the `NORDLYS_API_KEY` environment variable.
    */
   apiKey?: string;
 
@@ -52,18 +52,14 @@ export interface AdaptiveProviderSettings {
    * or to provide a custom fetch implementation for e.g. testing.
    */
   fetch?: FetchFunction;
-
-  /**
-   * Default provider to use for comparisons and fallbacks.
-   */
 }
 
 /**
- * Create an Adaptive AI provider instance.
+ * Create a Nordlys AI provider instance.
  */
-export function createAdaptive(
-  options: AdaptiveProviderSettings = {}
-): AdaptiveProvider {
+export function createNordlys(
+  options: NordlysProviderSettings = {}
+): NordlysProvider {
   const baseURL =
     withoutTrailingSlash(options.baseURL) ??
     'https://backend.mangoplant-a7a21605.swedencentral.azurecontainerapps.io/v1';
@@ -71,16 +67,16 @@ export function createAdaptive(
   const getHeaders = () => ({
     Authorization: `Bearer ${loadApiKey({
       apiKey: options.apiKey,
-      environmentVariableName: 'ADAPTIVE_API_KEY',
-      description: 'Adaptive',
+      environmentVariableName: 'NORDLYS_API_KEY',
+      description: 'Nordlys',
     })}`,
     'Content-Type': 'application/json',
     ...options.headers,
   });
 
   const createChatModel = () =>
-    new AdaptiveChatLanguageModel('', {
-      provider: 'adaptive.chat',
+    new NordlysChatLanguageModel('', {
+      provider: 'nordlys.chat',
       baseURL,
       headers: getHeaders,
       fetch: options.fetch,
@@ -89,7 +85,7 @@ export function createAdaptive(
   const provider = function () {
     if (new.target) {
       throw new Error(
-        'The Adaptive model function cannot be called with the new keyword.'
+        'The Nordlys model function cannot be called with the new keyword.'
       );
     }
 
@@ -99,18 +95,20 @@ export function createAdaptive(
   provider.languageModel = createChatModel;
   provider.chat = createChatModel;
 
-  provider.textEmbeddingModel = (modelId: string) => {
-    throw new NoSuchModelError({ modelId, modelType: 'textEmbeddingModel' });
+  provider.embeddingModel = (modelId: string) => {
+    throw new NoSuchModelError({ modelId, modelType: 'embeddingModel' });
   };
 
   provider.imageModel = (modelId: string) => {
     throw new NoSuchModelError({ modelId, modelType: 'imageModel' });
   };
 
+  provider.specificationVersion = 'v3' as const;
+
   return Object.freeze(provider);
 }
 
 /**
- * Default Adaptive provider instance.
+ * Default Nordlys provider instance.
  */
-export const adaptive = createAdaptive();
+export const nordlys = createNordlys();

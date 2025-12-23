@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { convertToAdaptiveChatMessages } from './convert-to-adaptive-chat-messages';
+import { convertToNordlysChatMessages } from './convert-to-nordlys-chat-messages';
 
 const base64Image = 'AAECAw==';
 const base64Audio = 'AAECAw==';
@@ -8,10 +8,10 @@ const base64Pdf = 'AQIDBAU=';
 // Helper for URL
 const exampleUrl = new URL('https://example.com/document.pdf');
 
-describe('convertToAdaptiveChatMessages', () => {
+describe('convertToNordlysChatMessages', () => {
   describe('system messages', () => {
     it('should forward system messages', () => {
-      const { messages, warnings } = convertToAdaptiveChatMessages({
+      const { messages, warnings } = convertToNordlysChatMessages({
         prompt: [{ role: 'system', content: 'You are a helpful assistant.' }],
       });
 
@@ -22,7 +22,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should remove system messages when requested', () => {
-      const { messages, warnings } = convertToAdaptiveChatMessages({
+      const { messages, warnings } = convertToNordlysChatMessages({
         prompt: [{ role: 'system', content: 'You are a helpful assistant.' }],
         systemMessageMode: 'remove',
       });
@@ -39,7 +39,7 @@ describe('convertToAdaptiveChatMessages', () => {
 
   describe('user messages', () => {
     it('should convert messages with only a text part to a string content', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'user',
@@ -52,7 +52,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should convert messages with image parts', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'user',
@@ -83,7 +83,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should convert messages with image file part as URL', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'user',
@@ -112,7 +112,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should handle image/* media type by converting to image/jpeg', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'user',
@@ -141,7 +141,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should add audio content for audio/wav file parts', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'user',
@@ -170,7 +170,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should add audio content for audio/mp3 file parts', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'user',
@@ -199,7 +199,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should add audio content for audio/mpeg file parts', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'user',
@@ -228,7 +228,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should convert messages with PDF file parts', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'user',
@@ -261,7 +261,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should use default filename for PDF file parts when not provided', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'user',
@@ -294,7 +294,7 @@ describe('convertToAdaptiveChatMessages', () => {
 
     it('should throw error for unsupported file types', () => {
       expect(() =>
-        convertToAdaptiveChatMessages({
+        convertToNordlysChatMessages({
           prompt: [
             {
               role: 'user',
@@ -315,7 +315,7 @@ describe('convertToAdaptiveChatMessages', () => {
 
     it('should throw error for PDF file parts with URLs', () => {
       expect(() =>
-        convertToAdaptiveChatMessages({
+        convertToNordlysChatMessages({
           prompt: [
             {
               role: 'user',
@@ -334,7 +334,7 @@ describe('convertToAdaptiveChatMessages', () => {
 
     it('should throw error for audio file parts with URLs', () => {
       expect(() =>
-        convertToAdaptiveChatMessages({
+        convertToNordlysChatMessages({
           prompt: [
             {
               role: 'user',
@@ -354,7 +354,7 @@ describe('convertToAdaptiveChatMessages', () => {
 
   describe('assistant and tool messages', () => {
     it('should stringify arguments to tool calls', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'assistant',
@@ -405,7 +405,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should handle assistant text and tool calls together', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'assistant',
@@ -441,7 +441,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should handle completely empty tool results', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'tool',
@@ -461,9 +461,9 @@ describe('convertToAdaptiveChatMessages', () => {
     });
   });
 
-  describe('V2 content types', () => {
+  describe('V3 content types', () => {
     it('should handle reasoning content in assistant messages', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'assistant',
@@ -495,7 +495,7 @@ describe('convertToAdaptiveChatMessages', () => {
     });
 
     it('should handle file content in assistant messages', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'assistant',
@@ -536,8 +536,8 @@ describe('convertToAdaptiveChatMessages', () => {
       ]);
     });
 
-    it('should handle all V2 content types together', () => {
-      const { messages } = convertToAdaptiveChatMessages({
+    it('should handle all V3 content types together', () => {
+      const { messages } = convertToNordlysChatMessages({
         prompt: [
           {
             role: 'assistant',

@@ -1,6 +1,6 @@
 export type {
-  AdaptiveProvider,
-  AdaptiveProviderSettings,
-} from './adaptive-provider';
-export { adaptive, createAdaptive } from './adaptive-provider';
-export type * from './adaptive-types';
+  NordlysProvider,
+  NordlysProviderSettings,
+} from './nordlys-provider';
+export { createNordlys, nordlys } from './nordlys-provider';
+export type * from './nordlys-types';
