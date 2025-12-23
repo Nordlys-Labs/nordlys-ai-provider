@@ -4,10 +4,10 @@ AI provider for [Vercel AI SDK v5](https://ai-sdk.dev/docs) that provides access
 
 ## Features
 
-- 🧠 **V3 Spec Compliant** - Reasoning, file generation, enhanced usage tracking
-- 🎯 **Mixture of Models** - Access to Nordlys models that activate the right models per prompt
-- 🔄 **Drop-in Replacement** - OpenAI-compatible API, works with existing code
-- 🚀 **Production Ready** - TypeScript, full test coverage
+- **V3 Spec Compliant** - Reasoning, file generation, enhanced usage tracking
+- **Mixture of Models** - Access to Nordlys models that activate the right models per prompt
+- **Drop-in Replacement** - OpenAI-compatible API, works with existing code
+- **Production Ready** - TypeScript, full test coverage
 
 ## Install
 
@@ -23,9 +23,8 @@ import { generateText } from 'ai';
 
 // Use Nordlys models
 const { text } = await generateText({
-  model: nordlys(),
+  model: nordlys('nordlys/hypernova'),
   prompt: 'Explain quantum computing',
-  providerOptions: { model: 'nordlys/hypernova' },
 });
 ```
 
@@ -33,9 +32,8 @@ const { text } = await generateText({
 
 ```ts
 const { content, usage } = await generateText({
-  model: nordlys(),
+  model: nordlys('nordlys/hypernova'),
   prompt: 'Solve: 2x + 5 = 17',
-  providerOptions: { model: 'nordlys/hypernova' },
 });
 
 // Access reasoning, files, tool calls
@@ -61,9 +59,8 @@ console.log({
 
 ```ts
 const { fullStream } = streamText({
-  model: nordlys(),
+  model: nordlys('nordlys/hypernova'),
   prompt: 'Count to 10',
-  providerOptions: { model: 'nordlys/hypernova' },
 });
 
 for await (const part of fullStream) {
@@ -76,9 +73,8 @@ for await (const part of fullStream) {
 
 ```ts
 const { text } = await generateText({
-  model: nordlys(),
+  model: nordlys('nordlys/hypernova'),
   prompt: 'What is the weather in SF?',
-  providerOptions: { model: 'nordlys/hypernova' },
   tools: {
     getWeather: {
       description: 'Get weather for location',
@@ -109,7 +105,7 @@ const nordlys = createNordlys({
 
 ```ts
 const { text } = await generateText({
-  model: nordlys(),
+  model: nordlys('nordlys/hypernova'),
   messages: [{
     role: 'user',
     content: [
@@ -117,18 +113,17 @@ const { text } = await generateText({
       { type: 'file', data: 'data:image/jpeg;base64,...', media_type: 'image/jpeg' },
     ],
   }],
-  providerOptions: { model: 'nordlys/hypernova' },
 });
 ```
 
 ## Supported Features
 
-- ✅ Text, reasoning, file generation, tool calls
-- ✅ Streaming with all event types
-- ✅ Multimodal inputs (images, audio, PDFs)
-- ✅ Enhanced usage tracking
-- ✅ AI SDK standard error handling
-- ✅ Full TypeScript support
+- Text, reasoning, file generation, tool calls
+- Streaming with all event types
+- Multimodal inputs (images, audio, PDFs)
+- Enhanced usage tracking
+- AI SDK standard error handling
+- Full TypeScript support
 
 ## Error Handling
 
@@ -137,9 +132,8 @@ import { APICallError, TooManyRequestsError } from 'ai';
 
 try {
   const result = await generateText({
-    model: nordlys(),
+    model: nordlys('nordlys/hypernova'),
     prompt: 'Hello',
-    providerOptions: { model: 'nordlys/hypernova' },
   });
 } catch (error) {
   if (error instanceof TooManyRequestsError) {

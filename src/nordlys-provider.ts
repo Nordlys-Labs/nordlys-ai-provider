@@ -11,17 +11,17 @@ import { NordlysChatLanguageModel } from './nordlys-chat-language-model';
 export type NordlysChatModelId = string;
 
 export interface NordlysProvider extends ProviderV3 {
-  (): LanguageModelV3;
+  (modelId: string): LanguageModelV3;
 
   /**
    * Creates a model for text generation with Nordlys models.
    */
-  languageModel: () => LanguageModelV3;
+  languageModel: (modelId: string) => LanguageModelV3;
 
   /**
    * Creates a chat model with Nordlys models.
    */
-  chat: () => LanguageModelV3;
+  chat: (modelId: string) => LanguageModelV3;
 
   /**
    * Text embedding is not currently supported by the Nordlys provider.
@@ -74,22 +74,22 @@ export function createNordlys(
     ...options.headers,
   });
 
-  const createChatModel = () =>
-    new NordlysChatLanguageModel('', {
+  const createChatModel = (modelId: string) =>
+    new NordlysChatLanguageModel(modelId, {
       provider: 'nordlys.chat',
       baseURL,
       headers: getHeaders,
       fetch: options.fetch,
     });
 
-  const provider = function () {
+  const provider = function (modelId: string) {
     if (new.target) {
       throw new Error(
         'The Nordlys model function cannot be called with the new keyword.'
       );
     }
 
-    return createChatModel();
+    return createChatModel(modelId);
   };
 
   provider.languageModel = createChatModel;

@@ -10,7 +10,7 @@ describe('nordlysProvider', () => {
     expect(typeof provider).toBe('function');
     expect(provider.languageModel).toBeInstanceOf(Function);
     expect(provider.chat).toBeInstanceOf(Function);
-    expect(() => provider()).not.toThrow();
+    expect(() => provider('nordlys/hypernova')).not.toThrow();
   });
 
   it('should create a chat model', () => {
@@ -18,9 +18,9 @@ describe('nordlysProvider', () => {
       apiKey: 'test-key',
       baseURL: 'https://example.com',
     });
-    const model = provider.chat();
+    const model = provider.chat('nordlys/hypernova');
     expect(model).toBeDefined();
-    expect(model.modelId).toBe('');
+    expect(model.modelId).toBe('nordlys/hypernova');
     expect(model.provider).toBe('nordlys.chat');
   });
 
@@ -29,9 +29,9 @@ describe('nordlysProvider', () => {
       apiKey: 'test-key',
       baseURL: 'https://example.com',
     });
-    const model = provider.languageModel();
+    const model = provider.languageModel('nordlys/hypernova');
     expect(model).toBeDefined();
-    expect(model.modelId).toBe('');
+    expect(model.modelId).toBe('nordlys/hypernova');
     expect(model.provider).toBe('nordlys.chat');
   });
 

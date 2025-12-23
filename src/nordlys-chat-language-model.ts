@@ -241,12 +241,7 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     const result = nordlysProviderOptions.safeParse(providerOptions ?? {});
     const nordlysOptions = result.success ? result.data : {};
 
-    // Model is required - use from providerOptions or throw error
-    if (!nordlysOptions.model) {
-      throw new Error(
-        'Model is required. Please provide a model in providerOptions.'
-      );
-    }
+    // Use modelId from constructor (model is set when creating the model instance)
 
     const {
       tools: nordlysTools,
@@ -266,7 +261,7 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     // Standardized settings
     const standardizedArgs = {
       messages: messages as NordlysChatCompletionMessage[],
-      model: nordlysOptions.model,
+      model: this.modelId,
       max_tokens:
         typeof maxOutputTokens === 'number' ? maxOutputTokens : undefined,
       max_completion_tokens: nordlysOptions.max_completion_tokens,

@@ -91,7 +91,7 @@ describe('nordlysChatLanguageModel', () => {
       clone: () => ({}) as Response,
     });
 
-    const model = new NordlysChatLanguageModel('', {
+    const model = new NordlysChatLanguageModel('test-model', {
       provider: 'nordlys.chat',
       baseURL: 'https://example.com',
       headers: () => ({}),
@@ -100,7 +100,6 @@ describe('nordlysChatLanguageModel', () => {
 
     const result = await model.doGenerate({
       prompt: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
-      providerOptions: { model: 'test-model' },
     });
 
     expect(result.content).toHaveLength(4);
