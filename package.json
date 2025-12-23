@@ -5,7 +5,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Egham-7/nordlys-ai-provider.git"
+    "url": "git+https://github.com/Nordlys-Labs/nordlys-ai-provider.git"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -32,7 +32,7 @@
     "vitest": "^4.0.16"
   },
   "bugs": {
-    "url": "https://github.com/Egham-7/nordlys-ai-provider/issues"
+    "url": "https://github.com/Nordlys-Labs/nordlys-ai-provider/issues"
   },
   "engines": {
     "node": ">=18"
