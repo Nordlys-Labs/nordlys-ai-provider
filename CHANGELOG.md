@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2024-12-23
+## [0.1.0] - 2024-12-23
 
 ### Breaking Changes
 
@@ -35,5 +35,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed unused `seed` parameter
 - Removed unused imports
 
-[Unreleased]: https://github.com/Nordlys-Labs/nordlys-ai-provider/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/Nordlys-Labs/nordlys-ai-provider/releases/tag/v1.0.0
+[Unreleased]: https://github.com/Nordlys-Labs/nordlys-ai-provider/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Nordlys-Labs/nordlys-ai-provider/releases/tag/v0.1.0
