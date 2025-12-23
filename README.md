@@ -1,12 +1,12 @@
 # Nordlys AI Provider
 
-Intelligent AI provider for [Vercel AI SDK v5](https://ai-sdk.dev/docs) with automatic model selection and V3 specification compliance.
+AI provider for [Vercel AI SDK v5](https://ai-sdk.dev/docs) that provides access to Nordlys models—a Mixture of Models system that behaves like a single unified model. V3 specification compliant.
 
 ## Features
 
-- 🤖 **Intelligent Model Selection** - Automatically picks optimal models
 - 🧠 **V3 Spec Compliant** - Reasoning, file generation, enhanced usage tracking
-- 🔄 **Multi-Provider** - OpenAI, Anthropic, Google, DeepSeek, Groq, etc.
+- 🎯 **Mixture of Models** - Access to Nordlys models that activate the right models per prompt
+- 🔄 **Drop-in Replacement** - OpenAI-compatible API, works with existing code
 - 🚀 **Production Ready** - TypeScript, full test coverage
 
 ## Install
@@ -21,11 +21,11 @@ npm i @nordlys-labs/nordlys-ai-provider
 import { nordlys } from '@nordlys-labs/nordlys-ai-provider';
 import { generateText } from 'ai';
 
-// Intelligent model selection
+// Use Nordlys models
 const { text } = await generateText({
   model: nordlys(),
   prompt: 'Explain quantum computing',
-  providerOptions: { model: 'claude-opus-4-5' },
+  providerOptions: { model: 'nordlys/hypernova' },
 });
 ```
 
@@ -35,7 +35,7 @@ const { text } = await generateText({
 const { content, usage } = await generateText({
   model: nordlys(),
   prompt: 'Solve: 2x + 5 = 17',
-  providerOptions: { model: 'claude-opus-4-5' },
+  providerOptions: { model: 'nordlys/hypernova' },
 });
 
 // Access reasoning, files, tool calls
@@ -63,7 +63,7 @@ console.log({
 const { fullStream } = streamText({
   model: nordlys(),
   prompt: 'Count to 10',
-  providerOptions: { model: 'claude-opus-4-5' },
+  providerOptions: { model: 'nordlys/hypernova' },
 });
 
 for await (const part of fullStream) {
@@ -78,7 +78,7 @@ for await (const part of fullStream) {
 const { text } = await generateText({
   model: nordlys(),
   prompt: 'What is the weather in SF?',
-  providerOptions: { model: 'claude-opus-4-5' },
+  providerOptions: { model: 'nordlys/hypernova' },
   tools: {
     getWeather: {
       description: 'Get weather for location',
@@ -117,7 +117,7 @@ const { text } = await generateText({
       { type: 'file', data: 'data:image/jpeg;base64,...', media_type: 'image/jpeg' },
     ],
   }],
-  providerOptions: { model: 'claude-opus-4-5' },
+  providerOptions: { model: 'nordlys/hypernova' },
 });
 ```
 
@@ -139,7 +139,7 @@ try {
   const result = await generateText({
     model: nordlys(),
     prompt: 'Hello',
-    providerOptions: { model: 'claude-opus-4-5' },
+    providerOptions: { model: 'nordlys/hypernova' },
   });
 } catch (error) {
   if (error instanceof TooManyRequestsError) {

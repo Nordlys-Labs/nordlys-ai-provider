@@ -14,12 +14,12 @@ export interface NordlysProvider extends ProviderV3 {
   (): LanguageModelV3;
 
   /**
-   * Creates a model for text generation with Nordlys provider selection.
+   * Creates a model for text generation with Nordlys models.
    */
   languageModel: () => LanguageModelV3;
 
   /**
-   * Creates a chat model with Nordlys provider selection.
+   * Creates a chat model with Nordlys models.
    */
   chat: () => LanguageModelV3;
 

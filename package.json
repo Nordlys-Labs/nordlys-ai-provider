@@ -48,7 +48,7 @@
     "vercel-ai",
     "vercel",
     "ai-sdk",
-    "intelligent model selection"
+    "mixture of models"
   ],
   "license": "Apache-2.0",
   "publishConfig": {

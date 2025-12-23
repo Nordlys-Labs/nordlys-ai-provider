@@ -4,7 +4,7 @@ This file provides guidance for AI coding agents working on the Nordlys AI Provi
 
 ## Project Overview
 
-Nordlys AI Provider is a TypeScript package that provides an intelligent AI provider implementation for the [Vercel AI SDK](https://ai-sdk.dev/docs). It implements the Language Model Specification V3 and provides automatic model selection capabilities.
+Nordlys AI Provider is a TypeScript package that provides an AI provider implementation for the [Vercel AI SDK](https://ai-sdk.dev/docs). It implements the Language Model Specification V3 and provides access to Nordlys models—a Mixture of Models system that activates the right models per prompt and behaves like a single unified model.
 
 **Key Technologies:**
 - **Language**: TypeScript (ESM modules)
