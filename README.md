@@ -12,7 +12,14 @@ AI provider for [Vercel AI SDK v5](https://ai-sdk.dev/docs) that provides access
 ## Install
 
 ```bash
+# npm
 npm i @nordlys-labs/nordlys-ai-provider
+
+# pnpm
+pnpm add @nordlys-labs/nordlys-ai-provider
+
+# bun
+bun add @nordlys-labs/nordlys-ai-provider
 ```
 
 ## Usage
