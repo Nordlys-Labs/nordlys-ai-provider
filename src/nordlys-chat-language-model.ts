@@ -1,10 +1,10 @@
 import {
   InvalidResponseDataError,
   type LanguageModelV3,
-  type LanguageModelV3CallWarning,
   type LanguageModelV3Content,
   type LanguageModelV3FinishReason,
   type LanguageModelV3Usage,
+  type SharedV3Warning,
 } from '@ai-sdk/provider';
 import type { FetchFunction } from '@ai-sdk/provider-utils';
 import {
@@ -22,10 +22,7 @@ import { mapNordlysFinishReason } from './map-nordlys-finish-reason';
 import { nordlysProviderOptions } from './nordlys-chat-options';
 import { nordlysFailedResponseHandler } from './nordlys-error';
 import { prepareTools } from './nordlys-prepare-tools';
-import type {
-  NordlysChatCompletionMessage,
-  NordlysChatCompletionRequest,
-} from './nordlys-types';
+import type { NordlysChatCompletionRequest } from './nordlys-types';
 
 interface NordlysChatConfig {
   provider: string;
@@ -227,14 +224,14 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     tools,
     toolChoice,
   }: Parameters<LanguageModelV3['doGenerate']>[0]) {
-    const warnings: LanguageModelV3CallWarning[] = [];
+    const warnings: SharedV3Warning[] = [];
 
     // Warn for unsupported settings
     if (topK != null) {
-      warnings.push({ type: 'unsupported-setting', setting: 'topK' });
+      warnings.push({ type: 'unsupported', feature: 'topK' });
     }
     if (responseFormat != null) {
-      warnings.push({ type: 'unsupported-setting', setting: 'responseFormat' });
+      warnings.push({ type: 'unsupported', feature: 'responseFormat' });
     }
 
     // Parse provider options with zod schema (flat, not nested)
@@ -260,7 +257,7 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
 
     // Standardized settings
     const standardizedArgs = {
-      messages: messages as NordlysChatCompletionMessage[],
+      messages,
       model: this.modelId,
       max_tokens:
         typeof maxOutputTokens === 'number' ? maxOutputTokens : undefined,
@@ -396,7 +393,6 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     const {
       prompt_tokens,
       completion_tokens,
-      total_tokens,
       reasoning_tokens,
       cached_input_tokens,
     } = value.usage ?? {};
@@ -405,16 +401,37 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       content,
       finishReason: choice.finish_reason
         ? mapNordlysFinishReason(choice.finish_reason)
-        : 'stop',
-      usage: value.usage
-        ? {
-            inputTokens: prompt_tokens,
-            outputTokens: completion_tokens,
-            totalTokens: total_tokens,
-            reasoningTokens: reasoning_tokens,
-            cachedInputTokens: cached_input_tokens,
-          }
-        : { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        : { unified: 'stop', raw: undefined },
+      usage:
+        value.usage && prompt_tokens != null
+          ? {
+              inputTokens: {
+                total: prompt_tokens,
+                noCache:
+                  cached_input_tokens != null
+                    ? prompt_tokens - cached_input_tokens
+                    : undefined,
+                cacheRead: cached_input_tokens,
+                cacheWrite: undefined,
+              },
+              outputTokens: {
+                total: completion_tokens,
+                text:
+                  completion_tokens != null && reasoning_tokens != null
+                    ? completion_tokens - reasoning_tokens
+                    : undefined,
+                reasoning: reasoning_tokens,
+              },
+            }
+          : {
+              inputTokens: {
+                total: 0,
+                noCache: undefined,
+                cacheRead: undefined,
+                cacheWrite: undefined,
+              },
+              outputTokens: { total: 0, text: undefined, reasoning: undefined },
+            },
       providerMetadata: value.provider
         ? {
             nordlys: {
@@ -468,20 +485,34 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       hasFinished: boolean;
     }> = [];
 
-    const state = {
-      finishReason: 'unknown' as LanguageModelV3FinishReason,
+    const state: {
+      finishReason: LanguageModelV3FinishReason;
+      usage: LanguageModelV3Usage;
+      isFirstChunk: boolean;
+      isActiveText: boolean;
+      provider: string | undefined;
+      serviceTier: string | undefined;
+      systemFingerprint: string | undefined;
+    } = {
+      finishReason: { unified: 'other', raw: undefined },
       usage: {
-        inputTokens: undefined as number | undefined,
-        outputTokens: undefined as number | undefined,
-        totalTokens: undefined as number | undefined,
-        reasoningTokens: undefined as number | undefined,
-        cachedInputTokens: undefined as number | undefined,
-      } as LanguageModelV3Usage,
+        inputTokens: {
+          total: undefined,
+          noCache: undefined,
+          cacheRead: undefined,
+          cacheWrite: undefined,
+        },
+        outputTokens: {
+          total: undefined,
+          text: undefined,
+          reasoning: undefined,
+        },
+      },
       isFirstChunk: true,
       isActiveText: false,
-      provider: undefined as string | undefined,
-      serviceTier: undefined as string | undefined,
-      systemFingerprint: undefined as string | undefined,
+      provider: undefined,
+      serviceTier: undefined,
+      systemFingerprint: undefined,
     };
 
     return {
@@ -493,7 +524,7 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
           async transform(chunk, controller) {
             // handle failed chunk parsing / validation:
             if (!chunk.success) {
-              state.finishReason = 'error';
+              state.finishReason = { unified: 'error', raw: undefined };
               controller.enqueue({ type: 'error', error: chunk.error });
               return;
             }
@@ -502,7 +533,7 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
 
             // Handle error responses
             if ('error' in value) {
-              state.finishReason = 'error';
+              state.finishReason = { unified: 'error', raw: undefined };
               controller.enqueue({
                 type: 'error',
                 error: new Error(value.error.message),
@@ -523,14 +554,24 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
             }
 
             if (value.usage != null) {
-              state.usage.inputTokens = value.usage.prompt_tokens ?? undefined;
-              state.usage.outputTokens =
-                value.usage.completion_tokens ?? undefined;
-              state.usage.totalTokens = value.usage.total_tokens ?? undefined;
-              state.usage.reasoningTokens =
-                value.usage.reasoning_tokens ?? undefined;
-              state.usage.cachedInputTokens =
+              state.usage.inputTokens.total =
+                value.usage.prompt_tokens ?? undefined;
+              state.usage.inputTokens.cacheRead =
                 value.usage.cached_input_tokens ?? undefined;
+              state.usage.inputTokens.noCache =
+                value.usage.prompt_tokens != null &&
+                value.usage.cached_input_tokens != null
+                  ? value.usage.prompt_tokens - value.usage.cached_input_tokens
+                  : undefined;
+              state.usage.outputTokens.total =
+                value.usage.completion_tokens ?? undefined;
+              state.usage.outputTokens.reasoning =
+                value.usage.reasoning_tokens ?? undefined;
+              state.usage.outputTokens.text =
+                value.usage.completion_tokens != null &&
+                value.usage.reasoning_tokens != null
+                  ? value.usage.completion_tokens - value.usage.reasoning_tokens
+                  : undefined;
             }
 
             if (value.provider) {
@@ -719,11 +760,22 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
 
             controller.enqueue({
               type: 'finish',
-              finishReason: state.finishReason ?? 'stop',
+              finishReason: state.finishReason ?? {
+                unified: 'stop',
+                raw: undefined,
+              },
               usage: state.usage ?? {
-                inputTokens: 0,
-                outputTokens: 0,
-                totalTokens: 0,
+                inputTokens: {
+                  total: 0,
+                  noCache: undefined,
+                  cacheRead: undefined,
+                  cacheWrite: undefined,
+                },
+                outputTokens: {
+                  total: 0,
+                  text: undefined,
+                  reasoning: undefined,
+                },
               },
               providerMetadata:
                 state.provider || state.serviceTier || state.systemFingerprint

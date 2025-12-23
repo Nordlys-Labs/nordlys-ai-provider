@@ -1,22 +1,27 @@
 // Converts generic chat messages to Nordlys API format
 import type {
-  LanguageModelV3CallWarning,
   LanguageModelV3Prompt,
   LanguageModelV3ToolResultPart,
+  SharedV3Warning,
 } from '@ai-sdk/provider';
 import { UnsupportedFunctionalityError } from '@ai-sdk/provider';
 import { convertToBase64 } from '@ai-sdk/provider-utils';
 import type { NordlysChatCompletionMessage } from './nordlys-types';
 
-function convertToolOutput(output: LanguageModelV3ToolResultPart): string {
+function convertToolOutput(
+  output: LanguageModelV3ToolResultPart['output']
+): string {
   switch (output.type) {
     case 'text':
     case 'error-text':
       return output.value;
-    case 'content':
     case 'json':
     case 'error-json':
       return JSON.stringify(output.value);
+    case 'content':
+      return JSON.stringify(output.value);
+    case 'execution-denied':
+      return '';
     default:
       return '';
   }
@@ -30,10 +35,10 @@ export function convertToNordlysChatMessages({
   systemMessageMode?: 'system' | 'developer' | 'remove';
 }): {
   messages: NordlysChatCompletionMessage[];
-  warnings: Array<LanguageModelV3CallWarning>;
+  warnings: Array<SharedV3Warning>;
 } {
   const messages: NordlysChatCompletionMessage[] = [];
-  const warnings: Array<LanguageModelV3CallWarning> = [];
+  const warnings: Array<SharedV3Warning> = [];
 
   for (const { role, content } of prompt) {
     switch (role) {
@@ -204,13 +209,15 @@ export function convertToNordlysChatMessages({
       }
       case 'tool': {
         for (const toolResponse of content) {
-          const contentValue = convertToolOutput(toolResponse.output);
-          if (contentValue) {
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolResponse.toolCallId,
-              content: contentValue,
-            });
+          if (toolResponse.type === 'tool-result') {
+            const contentValue = convertToolOutput(toolResponse.output);
+            if (contentValue) {
+              messages.push({
+                role: 'tool',
+                tool_call_id: toolResponse.toolCallId,
+                content: contentValue,
+              });
+            }
           }
         }
         break;

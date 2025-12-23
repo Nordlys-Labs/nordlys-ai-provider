@@ -121,11 +121,17 @@ describe('nordlysChatLanguageModel', () => {
     });
 
     expect(result.usage).toEqual({
-      inputTokens: 10,
-      outputTokens: 20,
-      totalTokens: 30,
-      reasoningTokens: 5,
-      cachedInputTokens: 2,
+      inputTokens: {
+        total: 10,
+        noCache: 8,
+        cacheRead: 2,
+        cacheWrite: undefined,
+      },
+      outputTokens: {
+        total: 20,
+        text: 15,
+        reasoning: 5,
+      },
     });
   });
 

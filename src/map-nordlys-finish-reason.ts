@@ -5,14 +5,14 @@ export function mapNordlysFinishReason(
 ): LanguageModelV3FinishReason {
   switch (reason) {
     case 'stop':
-      return 'stop';
+      return { unified: 'stop', raw: reason };
     case 'length':
-      return 'length';
+      return { unified: 'length', raw: reason };
     case 'content_filter':
-      return 'content-filter';
+      return { unified: 'content-filter', raw: reason };
     case 'tool_calls':
-      return 'tool-calls';
+      return { unified: 'tool-calls', raw: reason };
     default:
-      return 'unknown';
+      return { unified: 'other', raw: reason };
   }
 }
