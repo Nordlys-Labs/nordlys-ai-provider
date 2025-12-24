@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { convertToNordlysChatMessages } from './convert-to-nordlys-chat-messages';
 import { getResponseMetadata } from './get-response-metadata';
 import { mapNordlysFinishReason } from './map-nordlys-finish-reason';
-import { nordlysProviderOptions } from './nordlys-chat-options';
+import { nordlysProviderOptions, type NordlysChatSettings } from './nordlys-chat-options';
 import { nordlysFailedResponseHandler } from './nordlys-error';
 import { prepareTools } from './nordlys-prepare-tools';
 import type { NordlysChatCompletionRequest } from './nordlys-types';
@@ -196,10 +196,12 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
   readonly specificationVersion = 'v3';
   readonly modelId: string;
   private readonly config: NordlysChatConfig;
+  private readonly settings?: NordlysChatSettings;
 
-  constructor(modelId: string, config: NordlysChatConfig) {
+  constructor(modelId: string, settings: NordlysChatSettings | undefined, config: NordlysChatConfig) {
     this.modelId = modelId;
     this.config = config;
+    this.settings = settings;
   }
 
   get provider(): string {
@@ -226,8 +228,21 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
   }: Parameters<LanguageModelV3['doGenerate']>[0]) {
     const warnings: SharedV3Warning[] = [];
 
+    // Merge model-level settings with call-level options (call-level takes precedence)
+    const mergedMaxOutputTokens = maxOutputTokens ?? this.settings?.maxOutputTokens;
+    const mergedTemperature = temperature ?? this.settings?.temperature;
+    const mergedTopP = topP ?? this.settings?.topP;
+    const mergedTopK = topK ?? this.settings?.topK;
+    const mergedFrequencyPenalty = frequencyPenalty ?? this.settings?.frequencyPenalty;
+    const mergedPresencePenalty = presencePenalty ?? this.settings?.presencePenalty;
+    const mergedStopSequences = stopSequences ?? this.settings?.stopSequences;
+    const mergedProviderOptions = {
+      ...this.settings?.providerOptions,
+      ...providerOptions,
+    };
+
     // Warn for unsupported settings
-    if (topK != null) {
+    if (mergedTopK != null) {
       warnings.push({ type: 'unsupported', feature: 'topK' });
     }
     if (responseFormat != null) {
@@ -235,7 +250,7 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     }
 
     // Parse provider options with zod schema (flat, not nested)
-    const result = nordlysProviderOptions.safeParse(providerOptions ?? {});
+    const result = nordlysProviderOptions.safeParse(mergedProviderOptions ?? {});
     const nordlysOptions = result.success ? result.data : {};
 
     // Use modelId from constructor (model is set when creating the model instance)
@@ -260,13 +275,13 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       messages,
       model: this.modelId,
       max_tokens:
-        typeof maxOutputTokens === 'number' ? maxOutputTokens : undefined,
+        typeof mergedMaxOutputTokens === 'number' ? mergedMaxOutputTokens : undefined,
       max_completion_tokens: nordlysOptions.max_completion_tokens,
-      temperature,
-      top_p: topP,
-      stop: stopSequences,
-      presence_penalty: presencePenalty,
-      frequency_penalty: frequencyPenalty,
+      temperature: mergedTemperature,
+      top_p: mergedTopP,
+      stop: mergedStopSequences,
+      presence_penalty: mergedPresencePenalty,
+      frequency_penalty: mergedFrequencyPenalty,
       user: nordlysOptions.user,
       tools: nordlysTools,
       tool_choice: nordlysToolChoice,

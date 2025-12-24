@@ -3,7 +3,7 @@ import { NordlysChatLanguageModel } from './nordlys-chat-language-model';
 
 describe('nordlysChatLanguageModel', () => {
   it('should construct with modelId and config', () => {
-    const model = new NordlysChatLanguageModel('test-model', {
+    const model = new NordlysChatLanguageModel('test-model', undefined, {
       provider: 'nordlys.chat',
       baseURL: 'https://example.com',
       headers: () => ({}),
@@ -13,7 +13,7 @@ describe('nordlysChatLanguageModel', () => {
   });
 
   it('should have doGenerate and doStream methods', () => {
-    const model = new NordlysChatLanguageModel('test-model', {
+    const model = new NordlysChatLanguageModel('test-model', undefined, {
       provider: 'nordlys.chat',
       baseURL: 'https://example.com',
       headers: () => ({}),
@@ -23,7 +23,7 @@ describe('nordlysChatLanguageModel', () => {
   });
 
   it('should have correct specification version', () => {
-    const model = new NordlysChatLanguageModel('test-model', {
+    const model = new NordlysChatLanguageModel('test-model', undefined, {
       provider: 'nordlys.chat',
       baseURL: 'https://example.com',
       headers: () => ({}),
@@ -91,7 +91,7 @@ describe('nordlysChatLanguageModel', () => {
       clone: () => ({}) as Response,
     });
 
-    const model = new NordlysChatLanguageModel('test-model', {
+    const model = new NordlysChatLanguageModel('test-model', undefined, {
       provider: 'nordlys.chat',
       baseURL: 'https://example.com',
       headers: () => ({}),
@@ -136,7 +136,7 @@ describe('nordlysChatLanguageModel', () => {
   });
 
   it('should handle supportedUrls correctly', () => {
-    const model = new NordlysChatLanguageModel('test-model', {
+    const model = new NordlysChatLanguageModel('test-model', undefined, {
       provider: 'nordlys.chat',
       baseURL: 'https://example.com',
       headers: () => ({}),

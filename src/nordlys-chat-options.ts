@@ -140,3 +140,42 @@ export const nordlysProviderOptions = z.object({
  * Type for validated Nordlys provider options.
  */
 export type NordlysProviderOptions = z.infer<typeof nordlysProviderOptions>;
+
+/**
+ * Settings that can be set at model creation time.
+ * These settings will be merged with call-level options, with call-level taking precedence.
+ */
+export interface NordlysChatSettings {
+  /**
+   * Temperature setting for the model.
+   */
+  temperature?: number;
+  /**
+   * Maximum number of output tokens.
+   */
+  maxOutputTokens?: number;
+  /**
+   * Top-p sampling parameter.
+   */
+  topP?: number;
+  /**
+   * Top-k sampling parameter.
+   */
+  topK?: number;
+  /**
+   * Frequency penalty.
+   */
+  frequencyPenalty?: number;
+  /**
+   * Presence penalty.
+   */
+  presencePenalty?: number;
+  /**
+   * Stop sequences.
+   */
+  stopSequences?: string[];
+  /**
+   * Provider-specific options.
+   */
+  providerOptions?: NordlysProviderOptions;
+}

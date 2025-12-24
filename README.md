@@ -33,6 +33,15 @@ const { text } = await generateText({
   model: nordlys('nordlys/hypernova'),
   prompt: 'Explain quantum computing',
 });
+
+// With model-level settings
+const { text: creativeText } = await generateText({
+  model: nordlys('nordlys/hypernova', {
+    temperature: 0.9,
+    maxOutputTokens: 2000,
+  }),
+  prompt: 'Write a creative story',
+});
 ```
 
 ## V3 Content Types
@@ -49,7 +58,7 @@ content.forEach((item) => {
     case 'text': console.log(item.text); break;
     case 'reasoning': console.log(item.text); break;
     case 'file': console.log(item.media_type, item.data); break;
-    case 'tool-call': console.log(item.toolName, item.args); break;
+    case 'tool-call': console.log(item.toolName, item.input); break;
   }
 });
 
@@ -98,15 +107,90 @@ const { text } = await generateText({
 
 ## Configuration
 
+### Provider Configuration
+
 ```ts
 import { createNordlys } from '@nordlys-labs/nordlys-ai-provider';
 
-const nordlys = createNordlys({
+// Default provider (uses NORDLYS_API_KEY env var)
+const nordlys = createNordlys();
+
+// Provider with explicit API key
+const nordlysWithKey = createNordlys({
+  apiKey: 'your-api-key-here',
+});
+
+// Provider with custom base URL and API key
+const customNordlys = createNordlys({
   baseURL: 'https://your-api.com/v1',
-  apiKey: 'your-key', // or NORDLYS_API_KEY env var
+  apiKey: 'your-api-key-here',
   headers: { 'Custom-Header': 'value' },
 });
+
+// Multiple providers with different API keys
+const provider1 = createNordlys({ apiKey: 'key-for-user-1' });
+const provider2 = createNordlys({ apiKey: 'key-for-user-2' });
+
+// Use different providers for different models
+const { text } = await generateText({
+  model: provider1('nordlys/hypernova'),
+  prompt: 'Hello',
+});
 ```
+
+**API Key Priority:**
+1. Explicit `apiKey` parameter in `createNordlys()`
+2. `NORDLYS_API_KEY` environment variable (if `apiKey` not provided)
+
+### Model Settings
+
+You can pass settings when creating a model instance. These settings will be used as defaults for all calls, but can be overridden at call time:
+
+```ts
+import { nordlys } from '@nordlys-labs/nordlys-ai-provider';
+import { generateText } from 'ai';
+
+// Create a model with default settings
+const creativeModel = nordlys('nordlys/hypernova', {
+  temperature: 0.9,
+  topP: 0.95,
+  maxOutputTokens: 2000,
+});
+
+// Use the model (settings apply automatically)
+const { text } = await generateText({
+  model: creativeModel,
+  prompt: 'Write a story',
+});
+
+// Override settings at call time (call-level takes precedence)
+const { text: preciseText } = await generateText({
+  model: creativeModel,
+  prompt: 'Solve this math problem',
+  temperature: 0.1, // Overrides model-level temperature
+});
+
+// Settings can also be passed to languageModel and chat methods
+const model1 = nordlys.languageModel('nordlys/hypernova', {
+  temperature: 0.7,
+});
+
+const model2 = nordlys.chat('nordlys/hypernova', {
+  temperature: 0.8,
+  maxOutputTokens: 1000,
+});
+```
+
+### Available Settings
+
+- `temperature?: number` - Sampling temperature
+- `maxOutputTokens?: number` - Maximum tokens to generate
+- `topP?: number` - Top-p sampling parameter
+- `topK?: number` - Top-k sampling parameter (unsupported, will warn)
+- `frequencyPenalty?: number` - Frequency penalty
+- `presencePenalty?: number` - Presence penalty
+- `stopSequences?: string[]` - Stop sequences
+- `providerOptions?: NordlysProviderOptions` - Provider-specific options
 
 ## Multimodal
 
@@ -129,6 +213,7 @@ const { text } = await generateText({
 - Streaming with all event types
 - Multimodal inputs (images, audio, PDFs)
 - Enhanced usage tracking
+- Model-level settings support
 - AI SDK standard error handling
 - Full TypeScript support
 
@@ -151,6 +236,20 @@ try {
 
 ## Environment
 
+The API key can be provided via environment variable or explicitly when creating the provider:
+
 ```bash
+# Set environment variable (used as fallback if apiKey not provided)
 export NORDLYS_API_KEY="your-api-key"
 ```
+
+```ts
+// Or provide it explicitly when creating the provider
+import { createNordlys } from '@nordlys-labs/nordlys-ai-provider';
+
+const nordlys = createNordlys({
+  apiKey: process.env.NORDLYS_API_KEY, // Explicit API key takes precedence
+});
+```
+
+**Note:** If you provide an `apiKey` parameter to `createNordlys()`, it will override the `NORDLYS_API_KEY` environment variable for that provider instance.

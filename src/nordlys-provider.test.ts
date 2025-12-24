@@ -56,4 +56,40 @@ describe('nordlysProvider', () => {
     expect(nordlys.languageModel).toBeInstanceOf(Function);
     expect(nordlys.chat).toBeInstanceOf(Function);
   });
+
+  it('should accept settings parameter in provider function', () => {
+    const provider = createNordlys({
+      apiKey: 'test-key',
+      baseURL: 'https://example.com',
+    });
+    const model = provider('nordlys/hypernova', { temperature: 0.7 });
+    expect(model).toBeDefined();
+    expect(model.modelId).toBe('nordlys/hypernova');
+  });
+
+  it('should accept settings parameter in languageModel method', () => {
+    const provider = createNordlys({
+      apiKey: 'test-key',
+      baseURL: 'https://example.com',
+    });
+    const model = provider.languageModel('nordlys/hypernova', {
+      temperature: 0.8,
+      maxOutputTokens: 1000,
+    });
+    expect(model).toBeDefined();
+    expect(model.modelId).toBe('nordlys/hypernova');
+  });
+
+  it('should accept settings parameter in chat method', () => {
+    const provider = createNordlys({
+      apiKey: 'test-key',
+      baseURL: 'https://example.com',
+    });
+    const model = provider.chat('nordlys/hypernova', {
+      temperature: 0.9,
+      topP: 0.95,
+    });
+    expect(model).toBeDefined();
+    expect(model.modelId).toBe('nordlys/hypernova');
+  });
 });

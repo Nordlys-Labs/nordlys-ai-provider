@@ -7,21 +7,22 @@ import { NoSuchModelError } from '@ai-sdk/provider';
 import type { FetchFunction } from '@ai-sdk/provider-utils';
 import { loadApiKey, withoutTrailingSlash } from '@ai-sdk/provider-utils';
 import { NordlysChatLanguageModel } from './nordlys-chat-language-model';
+import type { NordlysChatSettings } from './nordlys-chat-options';
 
 export type NordlysChatModelId = string;
 
 export interface NordlysProvider extends ProviderV3 {
-  (modelId: string): LanguageModelV3;
+  (modelId: string, settings?: NordlysChatSettings): LanguageModelV3;
 
   /**
    * Creates a model for text generation with Nordlys models.
    */
-  languageModel: (modelId: string) => LanguageModelV3;
+  languageModel: (modelId: string, settings?: NordlysChatSettings) => LanguageModelV3;
 
   /**
    * Creates a chat model with Nordlys models.
    */
-  chat: (modelId: string) => LanguageModelV3;
+  chat: (modelId: string, settings?: NordlysChatSettings) => LanguageModelV3;
 
   /**
    * Text embedding is not currently supported by the Nordlys provider.
@@ -74,22 +75,22 @@ export function createNordlys(
     ...options.headers,
   });
 
-  const createChatModel = (modelId: string) =>
-    new NordlysChatLanguageModel(modelId, {
+  const createChatModel = (modelId: string, settings?: NordlysChatSettings) =>
+    new NordlysChatLanguageModel(modelId, settings, {
       provider: 'nordlys.chat',
       baseURL,
       headers: getHeaders,
       fetch: options.fetch,
     });
 
-  const provider = function (modelId: string) {
+  const provider = function (modelId: string, settings?: NordlysChatSettings) {
     if (new.target) {
       throw new Error(
         'The Nordlys model function cannot be called with the new keyword.'
       );
     }
 
-    return createChatModel(modelId);
+    return createChatModel(modelId, settings);
   };
 
   provider.languageModel = createChatModel;
