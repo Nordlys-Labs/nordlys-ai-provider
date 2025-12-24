@@ -19,7 +19,10 @@ import { z } from 'zod';
 import { convertToNordlysChatMessages } from './convert-to-nordlys-chat-messages';
 import { getResponseMetadata } from './get-response-metadata';
 import { mapNordlysFinishReason } from './map-nordlys-finish-reason';
-import { nordlysProviderOptions, type NordlysChatSettings } from './nordlys-chat-options';
+import {
+  type NordlysChatSettings,
+  nordlysProviderOptions,
+} from './nordlys-chat-options';
 import { nordlysFailedResponseHandler } from './nordlys-error';
 import { prepareTools } from './nordlys-prepare-tools';
 import type { NordlysChatCompletionRequest } from './nordlys-types';
@@ -198,7 +201,11 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
   private readonly config: NordlysChatConfig;
   private readonly settings?: NordlysChatSettings;
 
-  constructor(modelId: string, settings: NordlysChatSettings | undefined, config: NordlysChatConfig) {
+  constructor(
+    modelId: string,
+    settings: NordlysChatSettings | undefined,
+    config: NordlysChatConfig
+  ) {
     this.modelId = modelId;
     this.config = config;
     this.settings = settings;
@@ -229,12 +236,15 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     const warnings: SharedV3Warning[] = [];
 
     // Merge model-level settings with call-level options (call-level takes precedence)
-    const mergedMaxOutputTokens = maxOutputTokens ?? this.settings?.maxOutputTokens;
+    const mergedMaxOutputTokens =
+      maxOutputTokens ?? this.settings?.maxOutputTokens;
     const mergedTemperature = temperature ?? this.settings?.temperature;
     const mergedTopP = topP ?? this.settings?.topP;
     const mergedTopK = topK ?? this.settings?.topK;
-    const mergedFrequencyPenalty = frequencyPenalty ?? this.settings?.frequencyPenalty;
-    const mergedPresencePenalty = presencePenalty ?? this.settings?.presencePenalty;
+    const mergedFrequencyPenalty =
+      frequencyPenalty ?? this.settings?.frequencyPenalty;
+    const mergedPresencePenalty =
+      presencePenalty ?? this.settings?.presencePenalty;
     const mergedStopSequences = stopSequences ?? this.settings?.stopSequences;
     const mergedProviderOptions = {
       ...this.settings?.providerOptions,
@@ -250,7 +260,9 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     }
 
     // Parse provider options with zod schema (flat, not nested)
-    const result = nordlysProviderOptions.safeParse(mergedProviderOptions ?? {});
+    const result = nordlysProviderOptions.safeParse(
+      mergedProviderOptions ?? {}
+    );
     const nordlysOptions = result.success ? result.data : {};
 
     // Use modelId from constructor (model is set when creating the model instance)
@@ -275,7 +287,9 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       messages,
       model: this.modelId,
       max_tokens:
-        typeof mergedMaxOutputTokens === 'number' ? mergedMaxOutputTokens : undefined,
+        typeof mergedMaxOutputTokens === 'number'
+          ? mergedMaxOutputTokens
+          : undefined,
       max_completion_tokens: nordlysOptions.max_completion_tokens,
       temperature: mergedTemperature,
       top_p: mergedTopP,
