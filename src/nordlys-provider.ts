@@ -65,8 +65,7 @@ export function createNordlys(
   options: NordlysProviderSettings = {}
 ): NordlysProvider {
   const baseURL =
-    withoutTrailingSlash(options.baseURL) ??
-    'https://backend.mangoplant-a7a21605.swedencentral.azurecontainerapps.io/v1';
+    withoutTrailingSlash(options.baseURL) ?? 'https://api.nordlyslabs.com/v1';
 
   const getHeaders = () => ({
     Authorization: `Bearer ${loadApiKey({
