@@ -1,7 +1,7 @@
 {
   "name": "@nordlys-labs/nordlys-ai-provider",
   "author": "Nordlys",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "repository": {
     "type": "git",

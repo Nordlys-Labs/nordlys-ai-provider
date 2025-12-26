@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+### Patch Changes
+
+- 762a844: make usage and system fingerprint schema nullish instead of optional to handle null
+
 ## 0.2.1
 
 ### Patch Changes
