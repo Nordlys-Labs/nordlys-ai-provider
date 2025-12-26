@@ -179,10 +179,10 @@ const nordlysChatChunkSchema = z.union([
         reasoning_tokens: z.number().optional(),
         cached_input_tokens: z.number().optional(),
       })
-      .optional(),
+      .nullish(),
     provider: z.string().optional(),
     service_tier: z.string().optional(),
-    system_fingerprint: z.string().optional(),
+    system_fingerprint: z.string().nullish(),
   }),
   z.object({
     error: z.object({

@@ -92,4 +92,46 @@ describe('nordlysProvider', () => {
     expect(model).toBeDefined();
     expect(model.modelId).toBe('nordlys/hypernova');
   });
+
+  it('should accept providerOptions with reasoning_effort in chat method', () => {
+    const provider = createNordlys({
+      apiKey: 'test-key',
+      baseURL: 'https://example.com',
+    });
+    const model = provider.chat('nordlys/hypernova', {
+      providerOptions: {
+        reasoning_effort: 'medium',
+      },
+    });
+    expect(model).toBeDefined();
+    expect(model.modelId).toBe('nordlys/hypernova');
+  });
+
+  it('should accept providerOptions with reasoning_effort in languageModel method', () => {
+    const provider = createNordlys({
+      apiKey: 'test-key',
+      baseURL: 'https://example.com',
+    });
+    const model = provider.languageModel('nordlys/hypernova', {
+      providerOptions: {
+        reasoning_effort: 'high',
+      },
+    });
+    expect(model).toBeDefined();
+    expect(model.modelId).toBe('nordlys/hypernova');
+  });
+
+  it('should accept providerOptions with reasoning_effort in provider function', () => {
+    const provider = createNordlys({
+      apiKey: 'test-key',
+      baseURL: 'https://example.com',
+    });
+    const model = provider('nordlys/hypernova', {
+      providerOptions: {
+        reasoning_effort: 'low',
+      },
+    });
+    expect(model).toBeDefined();
+    expect(model.modelId).toBe('nordlys/hypernova');
+  });
 });

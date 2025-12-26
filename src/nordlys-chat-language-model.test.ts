@@ -146,4 +146,97 @@ describe('nordlysChatLanguageModel', () => {
       'application/pdf': [/^https:\/\/.*$/],
     });
   });
+
+  describe('reasoningEffort propagation', () => {
+    const mockResponse = {
+      id: 'test-id',
+      choices: [
+        {
+          index: 0,
+          message: {
+            content: 'Hello world',
+          },
+          finish_reason: 'stop',
+        },
+      ],
+      created: Date.now() / 1000,
+      model: 'test-model',
+      object: 'chat.completion',
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 20,
+        total_tokens: 30,
+      },
+      provider: 'test-provider',
+    };
+
+    const createMockFetch = () =>
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers(),
+        json: () => Promise.resolve(mockResponse),
+        text: () => Promise.resolve(JSON.stringify(mockResponse)),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+        blob: () => Promise.resolve(new Blob()),
+        formData: () => Promise.resolve(new FormData()),
+        body: null,
+        bodyUsed: false,
+        url: 'https://example.com',
+        redirected: false,
+        type: 'basic' as ResponseType,
+        clone: () => ({}) as Response,
+      });
+
+    it('should include reasoning_effort when set at model creation time', async () => {
+      const mockFetch = createMockFetch();
+
+      const model = new NordlysChatLanguageModel(
+        'test-model',
+        {
+          providerOptions: {
+            reasoning_effort: 'low',
+          },
+        },
+        {
+          provider: 'nordlys.chat',
+          baseURL: 'https://example.com',
+          headers: () => ({}),
+          fetch: mockFetch,
+        }
+      );
+
+      await model.doGenerate({
+        prompt: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const callArgs = mockFetch.mock.calls[0];
+      const requestBody = JSON.parse(callArgs[1]?.body as string);
+
+      expect(requestBody.reasoning_effort).toBe('low');
+    });
+
+    it('should not include reasoning_effort when not provided', async () => {
+      const mockFetch = createMockFetch();
+
+      const model = new NordlysChatLanguageModel('test-model', undefined, {
+        provider: 'nordlys.chat',
+        baseURL: 'https://example.com',
+        headers: () => ({}),
+        fetch: mockFetch,
+      });
+
+      await model.doGenerate({
+        prompt: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const callArgs = mockFetch.mock.calls[0];
+      const requestBody = JSON.parse(callArgs[1]?.body as string);
+
+      expect(requestBody.reasoning_effort).toBeUndefined();
+    });
+  });
 });
