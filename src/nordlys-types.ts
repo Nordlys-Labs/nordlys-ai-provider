@@ -1,66 +1,86 @@
 /**
- * Request payload for Nordlys chat completion API.
+ * Type definitions for Nordlys Responses API
+ * Migrated from Chat Completions API
  */
-export interface NordlysChatCompletionRequest {
-  messages: NordlysChatCompletionMessage[];
-  model: string; // Required field
-  max_tokens?: number;
-  max_completion_tokens?: number;
-  temperature?: number;
-  top_p?: number;
-  n?: number;
-  stream?: boolean;
-  stop?: string | string[];
-  presence_penalty?: number;
-  frequency_penalty?: number;
-  logit_bias?: Record<string, number>;
-  user?: string;
-  audio?: V2ChatCompletionAudioParam;
-  logprobs?: boolean;
-  metadata?: SharedMetadata;
-  modalities?: string[];
-  parallel_tool_calls?: boolean;
-  prediction?: V2ChatCompletionPredictionContentParam;
-  reasoning_effort?: string;
-  response_format?: V2ChatCompletionNewParamsResponseFormatUnion;
-  seed?: number;
-  service_tier?: string;
-  store?: boolean;
-  top_logprobs?: number;
-  web_search_options?: V2ChatCompletionNewParamsWebSearchOptions;
-  stream_options?: V2ChatCompletionStreamOptionsParam;
-  tools?: Array<{
-    type: 'function';
-    function: {
-      name: string;
-      description?: string;
-      parameters: unknown;
-    };
-  }>;
-  tool_choice?:
-    | { type: 'function'; function: { name: string } }
-    | 'auto'
-    | 'none'
-    | 'required';
-}
 
-export interface NordlysChatCompletionDeveloperMessage {
-  role: 'developer';
-  content: string;
-}
+// Re-export all types from nordlys-responses-types.ts
+export type {
+  NordlysResponse,
+  NordlysResponseCompletedEvent,
+  NordlysResponseCreatedEvent,
+  NordlysResponseErrorEvent,
+  NordlysResponseFileSearchToolCall,
+  NordlysResponseFunctionCallArgumentsDeltaEvent,
+  NordlysResponseFunctionCallArgumentsDoneEvent,
+  NordlysResponseFunctionToolCall,
+  NordlysResponseFunctionWebSearch,
+  NordlysResponseInProgressEvent,
+  NordlysResponseInputAudio,
+  NordlysResponseInputContentUnion,
+  NordlysResponseInputFile,
+  NordlysResponseInputFunctionCallOutput,
+  NordlysResponseInputImage,
+  NordlysResponseInputItemMessage,
+  NordlysResponseInputItemUnion,
+  NordlysResponseInputText,
+  NordlysResponseOutputItemAddedEvent,
+  NordlysResponseOutputItemDoneEvent,
+  NordlysResponseOutputItemUnion,
+  NordlysResponseOutputMessage,
+  NordlysResponseOutputMessageContentUnion,
+  NordlysResponseOutputText,
+  NordlysResponseReasoningItem,
+  NordlysResponseReasoningTextDeltaEvent,
+  NordlysResponseRefusal,
+  NordlysResponseRequest,
+  NordlysResponseStreamEventUnion,
+  NordlysResponseTextDeltaEvent,
+  NordlysResponseUsage,
+  NordlysToolChoiceUnion,
+  NordlysToolUnion,
+} from './nordlys-responses-types';
+
+// Legacy types for backward compatibility (deprecated - will be removed in future versions)
+// These are kept for now but should not be used in new code
+
+// Import types from responses-types for type aliases
+import type {
+  NordlysResponse,
+  NordlysResponseRequest,
+} from './nordlys-responses-types';
 
 /**
- * All possible message types for Nordlys chat completion.
+ * @deprecated Use NordlysResponseRequest instead
  */
-export type NordlysChatCompletionMessage =
-  | NordlysChatCompletionSystemMessage
-  | NordlysChatCompletionUserMessage
-  | NordlysChatCompletionAssistantMessage
-  | NordlysChatCompletionToolMessage
-  | NordlysChatCompletionDeveloperMessage;
+export type NordlysChatCompletionRequest = NordlysResponseRequest;
 
 /**
- * System message for Nordlys chat completion.
+ * @deprecated Use NordlysResponse instead
+ */
+export type NordlysChatCompletionResponse = NordlysResponse;
+
+// Re-export provider option types that are still used
+export type {
+  SharedMetadata,
+  SharedResponseFormatJSONObjectParam,
+  SharedResponseFormatJSONSchemaJSONSchemaParam,
+  SharedResponseFormatJSONSchemaParam,
+  SharedResponseFormatTextParam,
+  V2ChatCompletionAudioParam,
+  V2ChatCompletionNewParamsResponseFormatUnion,
+  V2ChatCompletionNewParamsWebSearchOptions,
+  V2ChatCompletionNewParamsWebSearchOptionsUserLocation,
+  V2ChatCompletionNewParamsWebSearchOptionsUserLocationApproximate,
+  V2ChatCompletionPredictionContentContentUnionParam,
+  V2ChatCompletionPredictionContentParam,
+  V2ChatCompletionStreamOptionsParam,
+} from './nordlys-responses-types';
+
+// These types are no longer needed but kept for reference
+// They should be removed in a future cleanup
+
+/**
+ * @deprecated No longer used - system messages go to instructions field
  */
 export interface NordlysChatCompletionSystemMessage {
   role: 'system';
@@ -68,7 +88,7 @@ export interface NordlysChatCompletionSystemMessage {
 }
 
 /**
- * User message for Nordlys chat completion.
+ * @deprecated No longer used - user messages are part of input array
  */
 export interface NordlysChatCompletionUserMessage {
   role: 'user';
@@ -76,7 +96,7 @@ export interface NordlysChatCompletionUserMessage {
 }
 
 /**
- * Content part for user messages.
+ * @deprecated No longer used
  */
 export type NordlysChatCompletionContentPart =
   | { type: 'text'; text: string }
@@ -88,7 +108,7 @@ export type NordlysChatCompletionContentPart =
   | { type: 'file'; file: { filename: string; file_data: string } };
 
 /**
- * Assistant message for Nordlys chat completion.
+ * @deprecated No longer used - assistant messages are part of input array for multi-turn
  */
 export interface NordlysChatCompletionAssistantMessage {
   role: 'assistant';
@@ -102,7 +122,7 @@ export interface NordlysChatCompletionAssistantMessage {
 }
 
 /**
- * Tool call for assistant messages.
+ * @deprecated No longer used
  */
 export interface NordlysChatCompletionMessageToolCall {
   type: 'function';
@@ -114,7 +134,7 @@ export interface NordlysChatCompletionMessageToolCall {
 }
 
 /**
- * Tool message for Nordlys chat completion.
+ * @deprecated No longer used - tool messages are function_call_output items
  */
 export interface NordlysChatCompletionToolMessage {
   role: 'tool';
@@ -123,26 +143,25 @@ export interface NordlysChatCompletionToolMessage {
 }
 
 /**
- * Response from Nordlys chat completion API.
+ * @deprecated No longer used
  */
-export interface NordlysChatCompletionResponse {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: Array<{
-    index: number;
-    message: NordlysChatCompletionAssistantMessage;
-    finish_reason: string | null;
-  }>;
-  usage?: NordlysChatCompletionUsage;
-  provider: string;
-  service_tier?: string;
-  system_fingerprint?: string;
+export interface NordlysChatCompletionDeveloperMessage {
+  role: 'developer';
+  content: string;
 }
 
 /**
- * Usage statistics for Nordlys chat completion API.
+ * @deprecated No longer used
+ */
+export type NordlysChatCompletionMessage =
+  | NordlysChatCompletionSystemMessage
+  | NordlysChatCompletionUserMessage
+  | NordlysChatCompletionAssistantMessage
+  | NordlysChatCompletionToolMessage
+  | NordlysChatCompletionDeveloperMessage;
+
+/**
+ * @deprecated Use NordlysResponseUsage instead
  */
 export interface NordlysChatCompletionUsage {
   prompt_tokens: number;
@@ -150,110 +169,4 @@ export interface NordlysChatCompletionUsage {
   total_tokens: number;
   reasoning_tokens?: number;
   cached_input_tokens?: number;
-}
-
-/**
- * Audio parameter for chat completion.
- */
-export interface V2ChatCompletionAudioParam {
-  format?: string;
-  voice?: string;
-}
-
-/**
- * Shared metadata for requests.
- */
-export interface SharedMetadata {
-  [key: string]: string;
-}
-
-/**
- * Prediction content parameter.
- */
-export interface V2ChatCompletionPredictionContentParam {
-  type?: string;
-  content?: V2ChatCompletionPredictionContentContentUnionParam;
-}
-
-/**
- * Prediction content union parameter.
- */
-export interface V2ChatCompletionPredictionContentContentUnionParam {
-  OfString?: string;
-  OfArrayOfContentParts?: Array<{ type: 'text'; text: string }>;
-}
-
-/**
- * Response format union parameter.
- */
-export interface V2ChatCompletionNewParamsResponseFormatUnion {
-  OfText?: SharedResponseFormatTextParam;
-  OfJSONObject?: SharedResponseFormatJSONObjectParam;
-  OfJSONSchema?: SharedResponseFormatJSONSchemaParam;
-}
-
-/**
- * Text response format parameter.
- */
-export interface SharedResponseFormatTextParam {
-  type: string;
-}
-
-/**
- * JSON object response format parameter.
- */
-export interface SharedResponseFormatJSONObjectParam {
-  type: string;
-}
-
-/**
- * JSON schema response format parameter.
- */
-export interface SharedResponseFormatJSONSchemaParam {
-  type: string;
-  json_schema?: SharedResponseFormatJSONSchemaJSONSchemaParam;
-}
-
-/**
- * JSON schema details parameter.
- */
-export interface SharedResponseFormatJSONSchemaJSONSchemaParam {
-  name: string;
-  schema: unknown;
-  description?: string;
-  strict?: boolean;
-}
-
-/**
- * Web search options parameter.
- */
-export interface V2ChatCompletionNewParamsWebSearchOptions {
-  search_context_size?: string;
-  user_location?: V2ChatCompletionNewParamsWebSearchOptionsUserLocation;
-}
-
-/**
- * User location for web search options.
- */
-export interface V2ChatCompletionNewParamsWebSearchOptionsUserLocation {
-  type?: string;
-  approximate?: V2ChatCompletionNewParamsWebSearchOptionsUserLocationApproximate;
-}
-
-/**
- * Approximate user location for web search options.
- */
-export interface V2ChatCompletionNewParamsWebSearchOptionsUserLocationApproximate {
-  city?: string;
-  country?: string;
-  region?: string;
-  timezone?: string;
-}
-
-/**
- * Stream options parameter.
- */
-export interface V2ChatCompletionStreamOptionsParam {
-  include_usage?: boolean;
-  include_obfuscation?: boolean;
 }

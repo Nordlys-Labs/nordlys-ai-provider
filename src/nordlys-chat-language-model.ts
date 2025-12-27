@@ -1,22 +1,18 @@
-import {
-  InvalidResponseDataError,
-  type LanguageModelV3,
-  type LanguageModelV3Content,
-  type LanguageModelV3FinishReason,
-  type LanguageModelV3Usage,
-  type SharedV3Warning,
+import type {
+  LanguageModelV3,
+  LanguageModelV3FinishReason,
+  LanguageModelV3Usage,
+  SharedV3Warning,
 } from '@ai-sdk/provider';
 import type { FetchFunction } from '@ai-sdk/provider-utils';
 import {
   combineHeaders,
   createEventSourceResponseHandler,
   createJsonResponseHandler,
-  generateId,
-  isParsableJson,
   postJsonToApi,
 } from '@ai-sdk/provider-utils';
 import { z } from 'zod';
-import { convertToNordlysChatMessages } from './convert-to-nordlys-chat-messages';
+import { convertToNordlysResponseInput } from './convert-to-nordlys-response-input';
 import { getResponseMetadata } from './get-response-metadata';
 import { mapNordlysFinishReason } from './map-nordlys-finish-reason';
 import {
@@ -25,7 +21,20 @@ import {
 } from './nordlys-chat-options';
 import { nordlysFailedResponseHandler } from './nordlys-error';
 import { prepareTools } from './nordlys-prepare-tools';
-import type { NordlysChatCompletionRequest } from './nordlys-types';
+import type { NordlysResponseStreamEventUnion } from './nordlys-responses-types';
+import type { NordlysResponseRequest } from './nordlys-types';
+import { parseNordlysResponse } from './parse-nordlys-response';
+import {
+  createStreamState,
+  extractResponseMetadata,
+  extractUsageFromCompleted,
+  getCompletedToolCall,
+  handleFunctionCallArgumentsDelta,
+  handleOutputItemAdded,
+  handleReasoningDelta,
+  handleTextDelta,
+  isToolCallComplete,
+} from './parse-nordlys-stream-event';
 
 interface NordlysChatConfig {
   provider: string;
@@ -35,73 +44,85 @@ interface NordlysChatConfig {
   defaultProvider?: string;
 }
 
-const nordlysChatResponseSchema = z.object({
-  id: z.string().nullish(),
-  created: z.number().nullish(),
-  model: z.string().nullish(),
-  choices: z
-    .array(
+// Zod schema for Responses API response
+const nordlysResponseSchema = z.object({
+  id: z.string(),
+  model: z.string(),
+  created_at: z.number(),
+  status: z.enum([
+    'completed',
+    'incomplete',
+    'failed',
+    'cancelled',
+    'queued',
+    'in_progress',
+  ]),
+  output: z.array(
+    z.union([
       z.object({
-        message: z.object({
-          role: z.enum(['assistant', '']).nullish(),
-          content: z.string().nullish(),
-          tool_calls: z
-            .array(
-              z.object({
-                id: z.string().nullish(),
-                type: z.literal('function'),
-                function: z.object({
-                  name: z.string(),
-                  arguments: z.string(),
-                }),
-              })
-            )
-            .nullish(),
-          reasoning_content: z.string().optional(),
-          generated_files: z
-            .array(
-              z.object({
-                media_type: z.string(),
-                data: z.string(),
-              })
-            )
-            .optional(),
-        }),
-        index: z.number(),
-        logprobs: z
-          .object({
-            content: z
-              .array(
-                z.object({
-                  token: z.string(),
-                  logprob: z.number(),
-                  top_logprobs: z.array(
-                    z.object({
-                      token: z.string(),
-                      logprob: z.number(),
-                    })
-                  ),
-                })
-              )
-              .nullish(),
-          })
-          .nullish(),
-        finish_reason: z.string().nullish(),
-      })
-    )
-    .optional(),
+        type: z.literal('message'),
+        id: z.string(),
+        role: z.literal('assistant'),
+        status: z.enum(['in_progress', 'completed', 'incomplete']),
+        content: z.array(
+          z.union([
+            z.object({
+              type: z.literal('output_text'),
+              text: z.string(),
+            }),
+            z.object({
+              type: z.literal('refusal'),
+              text: z.string(),
+            }),
+          ])
+        ),
+        created_at: z.number().optional(),
+      }),
+      z.object({
+        type: z.literal('reasoning'),
+        id: z.string(),
+        text: z.string(),
+        status: z.enum(['in_progress', 'completed', 'incomplete']),
+      }),
+      z.object({
+        type: z.literal('function_call'),
+        id: z.string(),
+        name: z.string(),
+        arguments: z.string(),
+        status: z.enum(['in_progress', 'completed', 'incomplete']),
+      }),
+      z.object({
+        type: z.literal('file_search'),
+        id: z.string(),
+        status: z.enum(['in_progress', 'completed', 'incomplete']),
+      }),
+      z.object({
+        type: z.literal('web_search'),
+        id: z.string(),
+        status: z.enum(['in_progress', 'completed', 'incomplete']),
+      }),
+    ])
+  ),
   usage: z
     .object({
-      completion_tokens: z.number(),
-      prompt_tokens: z.number(),
+      input_tokens: z.number(),
+      output_tokens: z.number(),
       total_tokens: z.number(),
-      reasoning_tokens: z.number().optional(),
-      cached_input_tokens: z.number().optional(),
+      input_tokens_details: z
+        .object({
+          cached_tokens: z.number().optional(),
+        })
+        .optional(),
+      output_tokens_details: z
+        .object({
+          reasoning_tokens: z.number().optional(),
+        })
+        .optional(),
     })
     .optional(),
-  system_fingerprint: z.string().optional(),
-  service_tier: z.string().optional(),
   provider: z.string().optional(),
+  service_tier: z.string().optional(),
+  system_fingerprint: z.string().optional(),
   error: z
     .object({
       message: z.string(),
@@ -112,86 +133,97 @@ const nordlysChatResponseSchema = z.object({
     .optional(),
 });
 
-const nordlysChatChunkSchema = z.union([
+// Zod schema for Responses API stream events
+const nordlysResponseStreamEventSchema = z.union([
   z.object({
-    id: z.string().nullish(),
-    created: z.number().nullish(),
-    model: z.string().nullish(),
-    choices: z.array(
-      z.object({
-        delta: z
-          .object({
-            role: z.enum(['assistant', '']).nullish(),
-            content: z.string().nullish(),
-            tool_calls: z
-              .array(
-                z.object({
-                  index: z.number(),
-                  id: z.string().nullish(),
-                  type: z
-                    .union([z.literal('function'), z.literal('')])
-                    .nullish(),
-                  function: z.object({
-                    name: z.string().nullish(),
-                    arguments: z.string().nullish(),
-                  }),
-                })
-              )
-              .nullish(),
-            reasoning_content: z.string().optional(),
-            generated_files: z
-              .array(
-                z.object({
-                  media_type: z.string(),
-                  data: z.string(),
-                })
-              )
-              .optional(),
-          })
-          .nullish(),
-        logprobs: z
-          .object({
-            content: z
-              .array(
-                z.object({
-                  token: z.string(),
-                  logprob: z.number(),
-                  top_logprobs: z.array(
-                    z.object({
-                      token: z.string(),
-                      logprob: z.number(),
-                    })
-                  ),
-                })
-              )
-              .nullish(),
-          })
-          .nullish(),
-        finish_reason: z.string().nullish(),
-        index: z.number(),
-      })
-    ),
-    usage: z
-      .object({
-        completion_tokens: z.number(),
-        prompt_tokens: z.number(),
-        total_tokens: z.number(),
-        reasoning_tokens: z.number().optional(),
-        cached_input_tokens: z.number().optional(),
-      })
-      .nullish(),
-    provider: z.string().optional(),
-    service_tier: z.string().optional(),
-    system_fingerprint: z.string().nullish(),
+    type: z.literal('response.created'),
+    response: nordlysResponseSchema,
   }),
   z.object({
+    type: z.literal('response.in_progress'),
+    response: z.object({
+      id: z.string(),
+      status: z.literal('in_progress'),
+    }),
+  }),
+  z.object({
+    type: z.literal('response.output_item.added'),
+    item: z.union([
+      z.object({
+        type: z.literal('message'),
+        id: z.string(),
+        role: z.literal('assistant'),
+        status: z.enum(['in_progress', 'completed', 'incomplete']),
+        content: z.array(
+          z.union([
+            z.object({
+              type: z.literal('output_text'),
+              text: z.string(),
+            }),
+            z.object({
+              type: z.literal('refusal'),
+              text: z.string(),
+            }),
+          ])
+        ),
+      }),
+      z.object({
+        type: z.literal('reasoning'),
+        id: z.string(),
+        text: z.string(),
+        status: z.enum(['in_progress', 'completed', 'incomplete']),
+      }),
+      z.object({
+        type: z.literal('function_call'),
+        id: z.string(),
+        name: z.string(),
+        arguments: z.string().optional(),
+        status: z.enum(['in_progress', 'completed', 'incomplete']),
+      }),
+    ]),
+    output_index: z.number(),
+  }),
+  z.object({
+    type: z.literal('response.output_item.done'),
+    item_id: z.string(),
+    output_index: z.number(),
+  }),
+  z.object({
+    type: z.literal('response.output_text.delta'),
+    delta: z.string(),
+    item_id: z.string(),
+    output_index: z.number(),
+    content_index: z.number(),
+  }),
+  z.object({
+    type: z.literal('response.reasoning_text.delta'),
+    delta: z.string(),
+    item_id: z.string(),
+    output_index: z.number(),
+  }),
+  z.object({
+    type: z.literal('response.function_call_arguments.delta'),
+    delta: z.string(),
+    item_id: z.string(),
+    output_index: z.number(),
+  }),
+  z.object({
+    type: z.literal('response.function_call_arguments.done'),
+    item_id: z.string(),
+    output_index: z.number(),
+  }),
+  z.object({
+    type: z.literal('response.completed'),
+    response: nordlysResponseSchema,
+  }),
+  z.object({
+    type: z.literal('response.error'),
     error: z.object({
       message: z.string(),
       type: z.string(),
       param: z.any().nullish(),
       code: z.any().nullish(),
     }),
-    provider: z.string().optional(),
   }),
 ]);
 
@@ -265,8 +297,7 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     );
     const nordlysOptions = result.success ? result.data : {};
 
-    // Use modelId from constructor (model is set when creating the model instance)
-
+    // Prepare tools
     const {
       tools: nordlysTools,
       toolChoice: nordlysToolChoice,
@@ -277,16 +308,20 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     });
     warnings.push(...toolWarnings);
 
-    // Convert messages
-    const { messages, warnings: messageWarnings } =
-      convertToNordlysChatMessages({ prompt });
-    warnings.push(...messageWarnings);
+    // Convert prompt to Responses API input format
+    const {
+      input,
+      instructions,
+      warnings: inputWarnings,
+    } = convertToNordlysResponseInput({ prompt });
+    warnings.push(...inputWarnings);
 
-    // Standardized settings
-    const standardizedArgs = {
-      messages,
+    // Build request with Responses API structure
+    const args: NordlysResponseRequest = {
+      input,
       model: this.modelId,
-      max_tokens:
+      instructions,
+      max_output_tokens:
         typeof mergedMaxOutputTokens === 'number'
           ? mergedMaxOutputTokens
           : undefined,
@@ -299,11 +334,6 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       user: nordlysOptions.user,
       tools: nordlysTools,
       tool_choice: nordlysToolChoice,
-    };
-
-    // Map new provider option fields
-    const args: NordlysChatCompletionRequest = {
-      ...standardizedArgs,
       ...(nordlysOptions.logit_bias
         ? { logit_bias: nordlysOptions.logit_bias }
         : {}),
@@ -356,12 +386,12 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     const { args: body, warnings } = await this.getArgs(options);
 
     const { responseHeaders, value, rawValue } = await postJsonToApi({
-      url: `${this.config.baseURL}/chat/completions`,
+      url: `${this.config.baseURL}/responses`,
       headers: combineHeaders(this.config.headers(), options.headers),
       body,
       failedResponseHandler: nordlysFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
-        nordlysChatResponseSchema
+        nordlysResponseSchema
       ),
       abortSignal: options.abortSignal,
       fetch: this.config.fetch,
@@ -376,80 +406,42 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       throw new Error(`Nordlys API Error: ${value.error.message}`);
     }
 
-    if (!value.choices || value.choices.length === 0) {
-      throw new Error('No choices returned from Nordlys API');
-    }
-
-    const choice = value.choices[0];
-    const content: Array<LanguageModelV3Content> = [];
-
-    if (choice.message?.content) {
-      content.push({ type: 'text', text: choice.message.content });
-    }
-
-    if (choice.message?.reasoning_content) {
-      content.push({
-        type: 'reasoning',
-        text: choice.message.reasoning_content,
-      });
-    }
-
-    if (
-      choice.message?.generated_files &&
-      choice.message.generated_files.length > 0
-    ) {
-      for (const file of choice.message.generated_files) {
-        content.push({
-          type: 'file',
-          mediaType: file.media_type,
-          data: file.data,
-        });
-      }
-    }
-
-    if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
-      for (const toolCall of choice.message.tool_calls) {
-        content.push({
-          type: 'tool-call',
-          toolCallId: toolCall.id || '',
-          toolName: toolCall.function?.name || '',
-          input: toolCall.function?.arguments || '{}',
-        });
-      }
-    }
+    // Parse response output to AI SDK content format
+    const content = parseNordlysResponse(value);
 
     // Extract usage information
     const {
-      prompt_tokens,
-      completion_tokens,
-      reasoning_tokens,
-      cached_input_tokens,
+      input_tokens,
+      output_tokens,
+      input_tokens_details,
+      output_tokens_details,
     } = value.usage ?? {};
+
+    const cachedTokens = input_tokens_details?.cached_tokens;
+    const reasoningTokens = output_tokens_details?.reasoning_tokens;
 
     return {
       content,
-      finishReason: choice.finish_reason
-        ? mapNordlysFinishReason(choice.finish_reason)
-        : { unified: 'stop', raw: undefined },
+      finishReason: mapNordlysFinishReason(value.status),
       usage:
-        value.usage && prompt_tokens != null
+        value.usage && input_tokens != null
           ? {
               inputTokens: {
-                total: prompt_tokens,
+                total: input_tokens,
                 noCache:
-                  cached_input_tokens != null
-                    ? prompt_tokens - cached_input_tokens
+                  cachedTokens != null
+                    ? input_tokens - cachedTokens
                     : undefined,
-                cacheRead: cached_input_tokens,
+                cacheRead: cachedTokens,
                 cacheWrite: undefined,
               },
               outputTokens: {
-                total: completion_tokens,
+                total: output_tokens,
                 text:
-                  completion_tokens != null && reasoning_tokens != null
-                    ? completion_tokens - reasoning_tokens
+                  output_tokens != null && reasoningTokens != null
+                    ? output_tokens - reasoningTokens
                     : undefined,
-                reasoning: reasoning_tokens,
+                reasoning: reasoningTokens,
               },
             }
           : {
@@ -474,7 +466,7 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       response: {
         id: value.id ?? '',
         modelId: value.model ?? '',
-        timestamp: new Date((value.created ?? 0) * 1000),
+        timestamp: new Date((value.created_at ?? 0) * 1000),
         headers: responseHeaders,
         body: rawValue,
       },
@@ -493,32 +485,22 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     };
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}/chat/completions`,
+      url: `${this.config.baseURL}/responses`,
       headers: combineHeaders(this.config.headers(), options.headers),
       body,
       failedResponseHandler: nordlysFailedResponseHandler,
       successfulResponseHandler: createEventSourceResponseHandler(
-        nordlysChatChunkSchema
+        nordlysResponseStreamEventSchema
       ),
       abortSignal: options.abortSignal,
       fetch: this.config.fetch,
     });
 
-    const toolCalls: Array<{
-      id: string;
-      type: 'function';
-      function: {
-        name: string;
-        arguments: string;
-      };
-      hasFinished: boolean;
-    }> = [];
-
-    const state: {
+    const streamParseState = createStreamState();
+    const streamState: {
       finishReason: LanguageModelV3FinishReason;
       usage: LanguageModelV3Usage;
       isFirstChunk: boolean;
-      isActiveText: boolean;
       provider: string | undefined;
       serviceTier: string | undefined;
       systemFingerprint: string | undefined;
@@ -538,7 +520,6 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
         },
       },
       isFirstChunk: true,
-      isActiveText: false,
       provider: undefined,
       serviceTier: undefined,
       systemFingerprint: undefined,
@@ -551,249 +532,195 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
             controller.enqueue({ type: 'stream-start', warnings });
           },
           async transform(chunk, controller) {
-            // handle failed chunk parsing / validation:
+            // Handle failed chunk parsing / validation
             if (!chunk.success) {
-              state.finishReason = { unified: 'error', raw: undefined };
+              streamState.finishReason = { unified: 'error', raw: undefined };
               controller.enqueue({ type: 'error', error: chunk.error });
               return;
             }
 
-            const value = chunk.value;
+            const event = chunk.value as NordlysResponseStreamEventUnion;
 
-            // Handle error responses
-            if ('error' in value) {
-              state.finishReason = { unified: 'error', raw: undefined };
+            // Handle error events
+            if (event.type === 'response.error') {
+              streamState.finishReason = { unified: 'error', raw: undefined };
               controller.enqueue({
                 type: 'error',
-                error: new Error(value.error.message),
+                error: new Error(event.error.message),
               });
               return;
             }
 
-            if (state.isFirstChunk) {
-              state.isFirstChunk = false;
-              controller.enqueue({
-                type: 'response-metadata',
-                ...getResponseMetadata({
-                  id: value.id ?? '',
-                  model: value.model ?? '',
-                  created: value.created ?? 0,
-                }),
-              });
-            }
-
-            if (value.usage != null) {
-              state.usage.inputTokens.total =
-                value.usage.prompt_tokens ?? undefined;
-              state.usage.inputTokens.cacheRead =
-                value.usage.cached_input_tokens ?? undefined;
-              state.usage.inputTokens.noCache =
-                value.usage.prompt_tokens != null &&
-                value.usage.cached_input_tokens != null
-                  ? value.usage.prompt_tokens - value.usage.cached_input_tokens
-                  : undefined;
-              state.usage.outputTokens.total =
-                value.usage.completion_tokens ?? undefined;
-              state.usage.outputTokens.reasoning =
-                value.usage.reasoning_tokens ?? undefined;
-              state.usage.outputTokens.text =
-                value.usage.completion_tokens != null &&
-                value.usage.reasoning_tokens != null
-                  ? value.usage.completion_tokens - value.usage.reasoning_tokens
-                  : undefined;
-            }
-
-            if (value.provider) {
-              state.provider = value.provider;
-            }
-
-            if (value.service_tier) {
-              state.serviceTier = value.service_tier;
-            }
-
-            if (value.system_fingerprint) {
-              state.systemFingerprint = value.system_fingerprint;
-            }
-
-            const choice = value.choices[0];
-            if (choice?.finish_reason != null) {
-              state.finishReason = mapNordlysFinishReason(choice.finish_reason);
-            }
-
-            if (!choice?.delta) {
-              return;
-            }
-
-            const delta = choice.delta;
-
-            if (delta.content != null) {
-              if (!state.isActiveText) {
-                controller.enqueue({ type: 'text-start', id: 'text-1' });
-                state.isActiveText = true;
+            // Handle response.created event
+            if (event.type === 'response.created') {
+              if (streamState.isFirstChunk) {
+                streamState.isFirstChunk = false;
+                const metadata = extractResponseMetadata(event);
+                controller.enqueue({
+                  type: 'response-metadata',
+                  ...getResponseMetadata({
+                    id: metadata.id,
+                    model: metadata.model,
+                    created: metadata.created,
+                  }),
+                });
               }
+            }
+
+            // Handle response.completed event
+            if (event.type === 'response.completed') {
+              const usage = extractUsageFromCompleted(event);
+              streamState.usage = {
+                inputTokens: {
+                  total: usage.inputTokens.total,
+                  noCache: usage.inputTokens.noCache,
+                  cacheRead: usage.inputTokens.cacheRead,
+                  cacheWrite: undefined,
+                },
+                outputTokens: {
+                  total: usage.outputTokens.total,
+                  text: usage.outputTokens.text,
+                  reasoning: usage.outputTokens.reasoning,
+                },
+              };
+              streamState.finishReason = mapNordlysFinishReason(
+                event.response.status
+              );
+              if (event.response.provider) {
+                streamState.provider = event.response.provider;
+              }
+              if (event.response.service_tier) {
+                streamState.serviceTier = event.response.service_tier;
+              }
+              if (event.response.system_fingerprint) {
+                streamState.systemFingerprint =
+                  event.response.system_fingerprint;
+              }
+            }
+
+            // Handle response.output_item.added event
+            if (event.type === 'response.output_item.added') {
+              const result = handleOutputItemAdded(event, streamParseState);
+              if (result.shouldEmitTextStart && result.textItemId) {
+                controller.enqueue({
+                  type: 'text-start',
+                  id: result.textItemId,
+                });
+              }
+              if (result.shouldEmitReasoningStart && result.reasoningItemId) {
+                controller.enqueue({
+                  type: 'reasoning-delta',
+                  id: result.reasoningItemId,
+                  delta: '', // Initial empty delta for start
+                });
+              }
+              if (
+                result.shouldEmitToolInputStart &&
+                result.toolCallId &&
+                result.toolName
+              ) {
+                controller.enqueue({
+                  type: 'tool-input-start',
+                  id: result.toolCallId,
+                  toolName: result.toolName,
+                });
+              }
+            }
+
+            // Handle response.output_text.delta event
+            if (event.type === 'response.output_text.delta') {
+              const { delta, itemId } = handleTextDelta(
+                event,
+                streamParseState
+              );
               controller.enqueue({
                 type: 'text-delta',
-                id: 'text-1',
-                delta: delta.content,
+                id: itemId,
+                delta,
               });
             }
 
-            if (delta.reasoning_content != null) {
+            // Handle response.reasoning_text.delta event
+            if (event.type === 'response.reasoning_text.delta') {
+              const { delta, itemId } = handleReasoningDelta(
+                event,
+                streamParseState
+              );
               controller.enqueue({
                 type: 'reasoning-delta',
-                id: 'reasoning-1',
-                delta: delta.reasoning_content,
+                id: itemId,
+                delta,
               });
             }
 
-            if (
-              delta.generated_files != null &&
-              Array.isArray(delta.generated_files)
-            ) {
-              for (const file of delta.generated_files) {
+            // Handle response.function_call_arguments.delta event
+            if (event.type === 'response.function_call_arguments.delta') {
+              const { delta, toolCallId } = handleFunctionCallArgumentsDelta(
+                event,
+                streamParseState
+              );
+              controller.enqueue({
+                type: 'tool-input-delta',
+                id: toolCallId,
+                delta,
+              });
+
+              // Check if tool call is complete
+              if (isToolCallComplete(toolCallId, streamParseState)) {
                 controller.enqueue({
-                  type: 'file',
-                  mediaType: file.media_type,
-                  data: file.data,
+                  type: 'tool-input-end',
+                  id: toolCallId,
                 });
+
+                const toolCall = getCompletedToolCall(
+                  toolCallId,
+                  streamParseState
+                );
+                if (toolCall) {
+                  controller.enqueue({
+                    type: 'tool-call',
+                    toolCallId: toolCall.toolCallId,
+                    toolName: toolCall.toolName,
+                    input: toolCall.input,
+                  });
+                }
               }
             }
 
-            if (delta.tool_calls != null && Array.isArray(delta.tool_calls)) {
-              for (const toolCallDelta of delta.tool_calls) {
-                const index = toolCallDelta.index;
+            // Handle response.function_call_arguments.done event
+            if (event.type === 'response.function_call_arguments.done') {
+              controller.enqueue({
+                type: 'tool-input-end',
+                id: event.item_id,
+              });
 
-                // Tool call start. Nordlys returns all information except the arguments in the first chunk.
-                if (toolCalls[index] == null) {
-                  if (
-                    toolCallDelta.type !== 'function' &&
-                    toolCallDelta.type !== ''
-                  ) {
-                    throw new InvalidResponseDataError({
-                      data: toolCallDelta,
-                      message: `Expected 'function' type.`,
-                    });
-                  }
-
-                  if (toolCallDelta.id == null) {
-                    throw new InvalidResponseDataError({
-                      data: toolCallDelta,
-                      message: `Expected 'id' to be a string.`,
-                    });
-                  }
-
-                  if (toolCallDelta.function?.name == null) {
-                    throw new InvalidResponseDataError({
-                      data: toolCallDelta,
-                      message: `Expected 'function.name' to be a string.`,
-                    });
-                  }
-
-                  controller.enqueue({
-                    type: 'tool-input-start',
-                    id: toolCallDelta.id,
-                    toolName: toolCallDelta.function.name,
-                  });
-
-                  toolCalls[index] = {
-                    id: toolCallDelta.id,
-                    type: 'function',
-                    function: {
-                      name: toolCallDelta.function.name,
-                      arguments: toolCallDelta.function.arguments ?? '',
-                    },
-                    hasFinished: false,
-                  };
-
-                  const toolCall = toolCalls[index];
-
-                  if (
-                    toolCall.function?.name != null &&
-                    toolCall.function?.arguments != null
-                  ) {
-                    // send delta if the argument text has already started:
-                    if (toolCall.function.arguments.length > 0) {
-                      controller.enqueue({
-                        type: 'tool-input-delta',
-                        id: toolCall.id,
-                        delta: toolCall.function.arguments,
-                      });
-                    }
-
-                    // check if tool call is complete
-                    // (some providers send the full tool call in one chunk):
-                    if (isParsableJson(toolCall.function.arguments)) {
-                      controller.enqueue({
-                        type: 'tool-input-end',
-                        id: toolCall.id,
-                      });
-
-                      controller.enqueue({
-                        type: 'tool-call',
-                        toolCallId: toolCall.id ?? generateId(),
-                        toolName: toolCall.function.name,
-                        input: toolCall.function.arguments,
-                      });
-                      toolCall.hasFinished = true;
-                    }
-                  }
-
-                  continue;
-                }
-
-                // existing tool call, merge if not finished
-                const toolCall = toolCalls[index];
-
-                if (toolCall.hasFinished) {
-                  continue;
-                }
-
-                if (toolCallDelta.function?.arguments != null) {
-                  toolCall.function.arguments +=
-                    toolCallDelta.function?.arguments ?? '';
-                }
-
-                // send delta
+              const toolCall = getCompletedToolCall(
+                event.item_id,
+                streamParseState
+              );
+              if (toolCall) {
                 controller.enqueue({
-                  type: 'tool-input-delta',
-                  id: toolCall.id,
-                  delta: toolCallDelta.function.arguments ?? '',
+                  type: 'tool-call',
+                  toolCallId: toolCall.toolCallId,
+                  toolName: toolCall.toolName,
+                  input: toolCall.input,
                 });
-
-                // check if tool call is complete
-                if (
-                  toolCall.function?.name != null &&
-                  toolCall.function?.arguments != null &&
-                  isParsableJson(toolCall.function.arguments)
-                ) {
-                  controller.enqueue({
-                    type: 'tool-input-end',
-                    id: toolCall.id,
-                  });
-
-                  controller.enqueue({
-                    type: 'tool-call',
-                    toolCallId: toolCall.id ?? generateId(),
-                    toolName: toolCall.function.name,
-                    input: toolCall.function.arguments,
-                  });
-                  toolCall.hasFinished = true;
-                }
               }
             }
           },
           flush(controller) {
-            if (state.isActiveText) {
-              controller.enqueue({ type: 'text-end', id: 'text-1' });
+            // End any active text items
+            for (const itemId of streamParseState.activeTextItems) {
+              controller.enqueue({ type: 'text-end', id: itemId });
             }
 
             controller.enqueue({
               type: 'finish',
-              finishReason: state.finishReason ?? {
+              finishReason: streamState.finishReason ?? {
                 unified: 'stop',
                 raw: undefined,
               },
-              usage: state.usage ?? {
+              usage: streamState.usage ?? {
                 inputTokens: {
                   total: 0,
                   noCache: undefined,
@@ -807,12 +734,14 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                 },
               },
               providerMetadata:
-                state.provider || state.serviceTier || state.systemFingerprint
+                streamState.provider ||
+                streamState.serviceTier ||
+                streamState.systemFingerprint
                   ? {
                       nordlys: {
-                        provider: state.provider,
-                        service_tier: state.serviceTier,
-                        system_fingerprint: state.systemFingerprint,
+                        provider: streamState.provider,
+                        service_tier: streamState.serviceTier,
+                        system_fingerprint: streamState.systemFingerprint,
                       },
                     }
                   : undefined,

@@ -2,30 +2,48 @@ import { describe, expect, it } from 'vitest';
 import { mapNordlysFinishReason } from './map-nordlys-finish-reason';
 
 describe('mapNordlysFinishReason', () => {
-  it('should map stop', () => {
-    expect(mapNordlysFinishReason('stop')).toEqual({
+  it('should map completed to stop', () => {
+    expect(mapNordlysFinishReason('completed')).toEqual({
       unified: 'stop',
-      raw: 'stop',
+      raw: undefined,
     });
   });
-  it('should map length', () => {
-    expect(mapNordlysFinishReason('length')).toEqual({
+
+  it('should map incomplete to length', () => {
+    expect(mapNordlysFinishReason('incomplete')).toEqual({
       unified: 'length',
-      raw: 'length',
+      raw: undefined,
     });
   });
-  it('should map content_filter', () => {
-    expect(mapNordlysFinishReason('content_filter')).toEqual({
-      unified: 'content-filter',
-      raw: 'content_filter',
+
+  it('should map failed to error', () => {
+    expect(mapNordlysFinishReason('failed')).toEqual({
+      unified: 'error',
+      raw: undefined,
     });
   });
-  it('should map tool_calls', () => {
-    expect(mapNordlysFinishReason('tool_calls')).toEqual({
-      unified: 'tool-calls',
-      raw: 'tool_calls',
+
+  it('should map cancelled to other', () => {
+    expect(mapNordlysFinishReason('cancelled')).toEqual({
+      unified: 'other',
+      raw: 'cancelled',
     });
   });
+
+  it('should map queued to other', () => {
+    expect(mapNordlysFinishReason('queued')).toEqual({
+      unified: 'other',
+      raw: 'queued',
+    });
+  });
+
+  it('should map in_progress to other', () => {
+    expect(mapNordlysFinishReason('in_progress')).toEqual({
+      unified: 'other',
+      raw: 'in_progress',
+    });
+  });
+
   it('should map unknown/undefined', () => {
     expect(mapNordlysFinishReason('something-else')).toEqual({
       unified: 'other',

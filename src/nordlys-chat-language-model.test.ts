@@ -34,41 +34,46 @@ describe('nordlysChatLanguageModel', () => {
   it('should support V3 content types in responses', async () => {
     const mockResponse = {
       id: 'test-id',
-      choices: [
+      model: 'test-model',
+      created_at: Date.now() / 1000,
+      status: 'completed' as const,
+      output: [
         {
-          index: 0,
-          message: {
-            content: 'Hello world',
-            reasoning_content: 'This is reasoning',
-            generated_files: [
-              {
-                media_type: 'image/png',
-                data: 'base64data',
-              },
-            ],
-            tool_calls: [
-              {
-                id: 'call-1',
-                type: 'function',
-                function: {
-                  name: 'test_tool',
-                  arguments: '{"param": "value"}',
-                },
-              },
-            ],
-          },
-          finish_reason: 'stop',
+          type: 'message' as const,
+          id: 'msg-1',
+          role: 'assistant' as const,
+          status: 'completed' as const,
+          content: [
+            {
+              type: 'output_text' as const,
+              text: 'Hello world',
+            },
+          ],
+        },
+        {
+          type: 'reasoning' as const,
+          id: 'reasoning-1',
+          text: 'This is reasoning',
+          status: 'completed' as const,
+        },
+        {
+          type: 'function_call' as const,
+          id: 'call-1',
+          name: 'test_tool',
+          arguments: '{"param": "value"}',
+          status: 'completed' as const,
         },
       ],
-      created: Date.now() / 1000,
-      model: 'test-model',
-      object: 'chat.completion',
       usage: {
-        prompt_tokens: 10,
-        completion_tokens: 20,
+        input_tokens: 10,
+        output_tokens: 20,
         total_tokens: 30,
-        reasoning_tokens: 5,
-        cached_input_tokens: 2,
+        output_tokens_details: {
+          reasoning_tokens: 5,
+        },
+        input_tokens_details: {
+          cached_tokens: 2,
+        },
       },
       provider: 'test-provider',
     };
@@ -102,18 +107,13 @@ describe('nordlysChatLanguageModel', () => {
       prompt: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
     });
 
-    expect(result.content).toHaveLength(4);
+    expect(result.content).toHaveLength(3);
     expect(result.content[0]).toEqual({ type: 'text', text: 'Hello world' });
     expect(result.content[1]).toEqual({
       type: 'reasoning',
       text: 'This is reasoning',
     });
     expect(result.content[2]).toEqual({
-      type: 'file',
-      mediaType: 'image/png',
-      data: 'base64data',
-    });
-    expect(result.content[3]).toEqual({
       type: 'tool-call',
       toolCallId: 'call-1',
       toolName: 'test_tool',
@@ -133,6 +133,11 @@ describe('nordlysChatLanguageModel', () => {
         reasoning: 5,
       },
     });
+
+    // Verify endpoint is /responses
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const callArgs = mockFetch.mock.calls[0];
+    expect(callArgs[0]).toContain('/responses');
   });
 
   it('should handle supportedUrls correctly', () => {
@@ -150,21 +155,26 @@ describe('nordlysChatLanguageModel', () => {
   describe('reasoningEffort propagation', () => {
     const mockResponse = {
       id: 'test-id',
-      choices: [
+      model: 'test-model',
+      created_at: Date.now() / 1000,
+      status: 'completed' as const,
+      output: [
         {
-          index: 0,
-          message: {
-            content: 'Hello world',
-          },
-          finish_reason: 'stop',
+          type: 'message' as const,
+          id: 'msg-1',
+          role: 'assistant' as const,
+          status: 'completed' as const,
+          content: [
+            {
+              type: 'output_text' as const,
+              text: 'Hello world',
+            },
+          ],
         },
       ],
-      created: Date.now() / 1000,
-      model: 'test-model',
-      object: 'chat.completion',
       usage: {
-        prompt_tokens: 10,
-        completion_tokens: 20,
+        input_tokens: 10,
+        output_tokens: 20,
         total_tokens: 30,
       },
       provider: 'test-provider',
@@ -216,6 +226,8 @@ describe('nordlysChatLanguageModel', () => {
       const requestBody = JSON.parse(callArgs[1]?.body as string);
 
       expect(requestBody.reasoning_effort).toBe('low');
+      expect(requestBody.input).toBeDefined();
+      expect(callArgs[0]).toContain('/responses');
     });
 
     it('should not include reasoning_effort when not provided', async () => {
@@ -237,6 +249,33 @@ describe('nordlysChatLanguageModel', () => {
       const requestBody = JSON.parse(callArgs[1]?.body as string);
 
       expect(requestBody.reasoning_effort).toBeUndefined();
+      expect(requestBody.input).toBeDefined();
+    });
+
+    it('should convert system messages to instructions', async () => {
+      const mockFetch = createMockFetch();
+
+      const model = new NordlysChatLanguageModel('test-model', undefined, {
+        provider: 'nordlys.chat',
+        baseURL: 'https://example.com',
+        headers: () => ({}),
+        fetch: mockFetch,
+      });
+
+      await model.doGenerate({
+        prompt: [
+          { role: 'system', content: 'You are helpful' },
+          { role: 'user', content: [{ type: 'text', text: 'Hello' }] },
+        ],
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const callArgs = mockFetch.mock.calls[0];
+      const requestBody = JSON.parse(callArgs[1]?.body as string);
+
+      expect(requestBody.instructions).toBe('You are helpful');
+      expect(requestBody.input).toBeDefined();
+      expect(Array.isArray(requestBody.input)).toBe(true);
     });
   });
 });
