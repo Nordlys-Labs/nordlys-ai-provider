@@ -229,6 +229,16 @@ const nordlysResponseStreamEventSchema = z.union([
     output_index: z.number().optional(),
   }),
   z.object({
+    type: z.literal('response.reasoning_summary_text.done'),
+    item_id: z.string(),
+    summary_index: z.number(),
+    text: z.string(),
+    // Nordlys-specific optional fields
+    model: z.string().optional(),
+    output_index: z.number().optional(),
+    sequence_number: z.number().optional(),
+  }),
+  z.object({
     type: z.literal('response.reasoning_summary_part.done'),
     item_id: z.string(),
     summary_index: z.number(),
@@ -918,6 +928,10 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                   },
                 },
               });
+            } else if (value.type === 'response.reasoning_summary_text.done') {
+              // This event signals completion of reasoning summary text with full text content.
+              // The streaming was already handled by delta events, so we don't need to emit
+              // any AI SDK events here. We just ensure the event is properly parsed.
             } else if (value.type === 'response.reasoning_summary_part.done') {
               // when Nordlys stores the message data, we can immediately conclude the reasoning part
               // since we do not need to send the encrypted content.

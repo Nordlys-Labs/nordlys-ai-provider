@@ -429,6 +429,19 @@ export interface NordlysResponseReasoningSummaryTextDeltaEvent {
 }
 
 /**
+ * Reasoning summary text done event
+ */
+export interface NordlysResponseReasoningSummaryTextDoneEvent {
+  type: 'response.reasoning_summary_text.done';
+  item_id: string;
+  summary_index: number;
+  text: string;
+  model?: string;
+  output_index?: number;
+  sequence_number?: number;
+}
+
+/**
  * Reasoning summary part done event
  */
 export interface NordlysResponseReasoningSummaryPartDoneEvent {
@@ -454,6 +467,7 @@ export type NordlysResponseStreamEventUnion =
   | NordlysResponseContentPartDoneEvent
   | NordlysResponseReasoningSummaryPartAddedEvent
   | NordlysResponseReasoningSummaryTextDeltaEvent
+  | NordlysResponseReasoningSummaryTextDoneEvent
   | NordlysResponseReasoningSummaryPartDoneEvent
   | NordlysResponseCompletedEvent
   | NordlysResponseErrorEvent;
