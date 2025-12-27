@@ -1093,27 +1093,61 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
           },
 
           flush(controller) {
-            // End any active text items
-            for (const itemId of streamParseState.activeTextItems) {
-              controller.enqueue({ type: 'text-end', id: itemId });
+            try {
+              // End any active text items
+              for (const itemId of streamParseState.activeTextItems) {
+                controller.enqueue({ type: 'text-end', id: itemId });
+              }
+
+              // End any active reasoning items
+              for (const itemId of streamParseState.activeReasoningItems) {
+                controller.enqueue({
+                  type: 'reasoning-end',
+                  id: itemId,
+                  providerMetadata: {
+                    [providerKey]: { itemId },
+                  },
+                });
+              }
+
+              // End any active tool calls
+              for (const toolCallId of streamParseState.activeToolCalls) {
+                controller.enqueue({ type: 'tool-input-end', id: toolCallId });
+              }
+
+              // Ensure providerMetadata structure is always valid
+              // Always include responseId (even if null) to match expected structure
+              const providerMetadata: SharedV3ProviderMetadata = {
+                [providerKey]: {
+                  responseId,
+                },
+              };
+
+              // Only set serviceTier if the metadata object exists and is valid
+              // Add defensive check to prevent accessing properties on undefined
+              if (serviceTier !== undefined && providerMetadata[providerKey]) {
+                providerMetadata[providerKey].serviceTier = serviceTier;
+              }
+
+              controller.enqueue({
+                type: 'finish',
+                finishReason,
+                usage: convertNordlysResponsesUsage(usage),
+                providerMetadata,
+              });
+            } catch {
+              // Ensure finish event is always emitted even if there are errors during cleanup
+              controller.enqueue({
+                type: 'finish',
+                finishReason: { unified: 'error', raw: undefined },
+                usage: convertNordlysResponsesUsage(usage),
+                providerMetadata: {
+                  [providerKey]: {
+                    responseId,
+                  },
+                },
+              });
             }
-
-            const providerMetadata: SharedV3ProviderMetadata = {
-              [providerKey]: {
-                responseId,
-              },
-            };
-
-            if (serviceTier !== undefined) {
-              providerMetadata[providerKey].serviceTier = serviceTier;
-            }
-
-            controller.enqueue({
-              type: 'finish',
-              finishReason,
-              usage: convertNordlysResponsesUsage(usage),
-              providerMetadata,
-            });
           },
         })
       ),
