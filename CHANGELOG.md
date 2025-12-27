@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.4
+
+### Patch Changes
+
+- 6e6ec96: fix: handle content_part events to prevent 'Cannot read properties of undefined' error
+
 ## 1.1.3
 
 ### Patch Changes
