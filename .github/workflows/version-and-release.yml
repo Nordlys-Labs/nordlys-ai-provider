@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node-version }}
 
@@ -62,7 +62,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
 
@@ -86,7 +86,7 @@ jobs:
         run: bun run test:coverage
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           directory: ./coverage
@@ -100,6 +100,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      id-token: write # Required for npm trusted publishing (OIDC)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -107,9 +108,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+          # For trusted publishing, remove NPM_TOKEN from env below
+          # and configure OIDC in npm: https://docs.npmjs.com/configuring-two-factor-authentication#setting-up-automatic-token-creation
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -122,7 +126,7 @@ jobs:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
-            key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+            ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -135,6 +139,10 @@ jobs:
           version: bun run version
           commit: 'chore: release'
           title: 'chore: release'
+          # Use GitHub API for commits (GPG-signed, attributed to token owner)
+          commitMode: github-api
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # NPM_TOKEN: Remove this once npm trusted publishing (OIDC) is configured
+          # See: https://docs.npmjs.com/configuring-two-factor-authentication#setting-up-automatic-token-creation
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
