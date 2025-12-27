@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.3
+
+### Patch Changes
+
+- 1196b33: Add response.content_part.added and response.content_part.done event types
+
 ## 1.1.2
 
 ### Patch Changes
