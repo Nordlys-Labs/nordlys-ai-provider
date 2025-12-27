@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type {
-  NordlysResponseCompletedEvent,
   NordlysResponseContentPartAddedEvent,
   NordlysResponseContentPartDoneEvent,
-  NordlysResponseCreatedEvent,
   NordlysResponseFunctionCallArgumentsDeltaEvent,
   NordlysResponseOutputItemAddedEvent,
   NordlysResponseReasoningTextDeltaEvent,
@@ -11,8 +9,6 @@ import type {
 } from './nordlys-responses-types';
 import {
   createStreamState,
-  extractResponseMetadata,
-  extractUsageFromCompleted,
   getCompletedToolCall,
   handleContentPartAdded,
   handleContentPartDone,
@@ -34,29 +30,6 @@ describe('parseNordlysStreamEvent', () => {
       expect(state.activeTextItems).toBeInstanceOf(Set);
       expect(state.activeReasoningItems).toBeInstanceOf(Set);
       expect(state.activeToolCalls).toBeInstanceOf(Set);
-    });
-  });
-
-  describe('extractResponseMetadata', () => {
-    it('should extract metadata from created event', () => {
-      const event: NordlysResponseCreatedEvent = {
-        type: 'response.created',
-        response: {
-          id: 'test-id',
-          model: 'test-model',
-          created_at: 1234567890,
-          status: 'completed',
-          output: [],
-        },
-      };
-
-      const result = extractResponseMetadata(event);
-
-      expect(result).toEqual({
-        id: 'test-id',
-        model: 'test-model',
-        created: 1234567890,
-      });
     });
   });
 
@@ -448,67 +421,6 @@ describe('parseNordlysStreamEvent', () => {
       const result = handleContentPartDone(event, state);
 
       expect(result.shouldEmitTextEnd).toBe(false);
-    });
-  });
-
-  describe('extractUsageFromCompleted', () => {
-    it('should extract usage information', () => {
-      const event: NordlysResponseCompletedEvent = {
-        type: 'response.completed',
-        response: {
-          id: 'test-id',
-          model: 'test-model',
-          created_at: Date.now() / 1000,
-          status: 'completed',
-          output: [],
-          usage: {
-            input_tokens: 10,
-            output_tokens: 20,
-            total_tokens: 30,
-            input_tokens_details: {
-              cached_tokens: 2,
-            },
-            output_tokens_details: {
-              reasoning_tokens: 5,
-            },
-          },
-        },
-      };
-
-      const result = extractUsageFromCompleted(event);
-
-      expect(result).toEqual({
-        inputTokens: {
-          total: 10,
-          cacheRead: 2,
-          noCache: 8,
-        },
-        outputTokens: {
-          total: 20,
-          reasoning: 5,
-          text: 15,
-        },
-      });
-    });
-
-    it('should handle missing usage', () => {
-      const event: NordlysResponseCompletedEvent = {
-        type: 'response.completed',
-        response: {
-          id: 'test-id',
-          model: 'test-model',
-          created_at: Date.now() / 1000,
-          status: 'completed',
-          output: [],
-        },
-      };
-
-      const result = extractUsageFromCompleted(event);
-
-      expect(result).toEqual({
-        inputTokens: { total: 0 },
-        outputTokens: { total: 0 },
-      });
     });
   });
 });

@@ -2,10 +2,8 @@
 // This is a helper for the streaming implementation - actual event handling
 // is done in the TransformStream in nordlys-chat-language-model.ts
 import type {
-  NordlysResponseCompletedEvent,
   NordlysResponseContentPartAddedEvent,
   NordlysResponseContentPartDoneEvent,
-  NordlysResponseCreatedEvent,
   NordlysResponseFunctionCallArgumentsDeltaEvent,
   NordlysResponseFunctionToolCall,
   NordlysResponseOutputItemAddedEvent,
@@ -49,21 +47,6 @@ export function createStreamState(): NordlysStreamState {
     activeTextItems: new Set(),
     activeReasoningItems: new Set(),
     activeToolCalls: new Set(),
-  };
-}
-
-/**
- * Extracts response metadata from created event
- */
-export function extractResponseMetadata(event: NordlysResponseCreatedEvent): {
-  id: string;
-  model: string;
-  created: number;
-} {
-  return {
-    id: event.response.id,
-    model: event.response.model,
-    created: event.response.created_at,
   };
 }
 
@@ -428,50 +411,4 @@ export function handleContentPartDone(
   }
 
   return result;
-}
-
-/**
- * Extracts usage from completed event
- */
-export function extractUsageFromCompleted(
-  event: NordlysResponseCompletedEvent
-): {
-  inputTokens: {
-    total: number;
-    cacheRead?: number;
-    noCache?: number;
-  };
-  outputTokens: {
-    total: number;
-    reasoning?: number;
-    text?: number;
-  };
-} {
-  const usage = event.response.usage;
-  if (!usage) {
-    return {
-      inputTokens: { total: 0 },
-      outputTokens: { total: 0 },
-    };
-  }
-
-  const cachedTokens = usage.input_tokens_details?.cached_tokens;
-  const reasoningTokens = usage.output_tokens_details?.reasoning_tokens;
-
-  return {
-    inputTokens: {
-      total: usage.input_tokens,
-      cacheRead: cachedTokens,
-      noCache:
-        cachedTokens != null ? usage.input_tokens - cachedTokens : undefined,
-    },
-    outputTokens: {
-      total: usage.output_tokens,
-      reasoning: reasoningTokens,
-      text:
-        reasoningTokens != null
-          ? usage.output_tokens - reasoningTokens
-          : undefined,
-    },
-  };
 }
