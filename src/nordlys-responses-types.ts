@@ -377,7 +377,7 @@ export interface NordlysResponse {
     | 'queued'
     | 'in_progress';
   output: NordlysResponseOutputItemUnion[];
-  usage?: NordlysResponseUsage;
+  usage?: NordlysResponseUsage | null;
   provider?: string;
   service_tier?: string;
   system_fingerprint?: string;
@@ -386,7 +386,7 @@ export interface NordlysResponse {
     type: string;
     param?: unknown;
     code?: unknown;
-  };
+  } | null;
 }
 
 // ============================================================================

@@ -119,7 +119,7 @@ const nordlysResponseSchema = z.object({
         })
         .optional(),
     })
-    .optional(),
+    .nullish(),
   provider: z.string().optional(),
   service_tier: z.string().optional(),
   system_fingerprint: z.string().optional(),
@@ -130,7 +130,7 @@ const nordlysResponseSchema = z.object({
       param: z.any().nullish(),
       code: z.any().nullish(),
     })
-    .optional(),
+    .nullish(),
 });
 
 // Zod schema for Responses API stream events
