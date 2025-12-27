@@ -58,20 +58,30 @@ interface NordlysChatConfig {
   defaultProvider?: string;
 }
 
+// Constants for response status values
+const RESPONSE_STATUS = {
+  COMPLETED: 'completed',
+  INCOMPLETE: 'incomplete',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled',
+  QUEUED: 'queued',
+  IN_PROGRESS: 'in_progress',
+} as const;
+
 // Zod schema for Responses API response
 const nordlysResponseSchema = z.object({
   id: z.string(),
   model: z.string(),
   created_at: z.number(),
   status: z.enum([
-    'completed',
-    'incomplete',
-    'failed',
-    'cancelled',
-    'queued',
-    'in_progress',
+    RESPONSE_STATUS.COMPLETED,
+    RESPONSE_STATUS.INCOMPLETE,
+    RESPONSE_STATUS.FAILED,
+    RESPONSE_STATUS.CANCELLED,
+    RESPONSE_STATUS.QUEUED,
+    RESPONSE_STATUS.IN_PROGRESS,
   ]),
-  output: z.array(z.any()), // Accept all output item types, we'll filter in processing
+  output: z.array(z.unknown()), // Accept all output item types, we'll filter in processing
   usage: z
     .object({
       input_tokens: z.number(),
@@ -96,8 +106,8 @@ const nordlysResponseSchema = z.object({
     .object({
       message: z.string(),
       type: z.string(),
-      param: z.any().nullish(),
-      code: z.any().nullish(),
+      param: z.unknown().nullish(),
+      code: z.unknown().nullish(),
     })
     .nullish(),
 });
@@ -117,7 +127,7 @@ const nordlysResponseStreamEventSchema = z.union([
   }),
   z.object({
     type: z.literal('response.output_item.added'),
-    item: z.any(), // Accept all item types, we'll filter in processing
+    item: z.unknown(), // Accept all item types, we'll filter in processing
     output_index: z.number(),
   }),
   z.object({
@@ -158,8 +168,8 @@ const nordlysResponseStreamEventSchema = z.union([
       z.object({
         type: z.literal('output_text'),
         text: z.string(),
-        annotations: z.array(z.any()).optional(),
-        logprobs: z.array(z.any()).optional(),
+        annotations: z.array(z.unknown()).optional(),
+        logprobs: z.array(z.unknown()).optional(),
       }),
       z.object({
         type: z.literal('refusal'),
@@ -181,8 +191,8 @@ const nordlysResponseStreamEventSchema = z.union([
       z.object({
         type: z.literal('output_text'),
         text: z.string(),
-        annotations: z.array(z.any()).optional(),
-        logprobs: z.array(z.any()).optional(),
+        annotations: z.array(z.unknown()).optional(),
+        logprobs: z.array(z.unknown()).optional(),
       }),
       z.object({
         type: z.literal('refusal'),
@@ -204,8 +214,8 @@ const nordlysResponseStreamEventSchema = z.union([
     error: z.object({
       message: z.string(),
       type: z.string(),
-      param: z.any().nullish(),
-      code: z.any().nullish(),
+      param: z.unknown().nullish(),
+      code: z.unknown().nullish(),
     }),
   }),
 ]);
@@ -234,6 +244,75 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     return this.config.provider;
   }
 
+  /**
+   * Merges reasoning configuration from model settings and call options.
+   * Call-level options take precedence over model-level settings.
+   */
+  private mergeReasoningOptions(
+    modelReasoning?: {
+      effort?: string;
+      summary?: 'auto' | 'concise' | 'detailed';
+    },
+    callReasoning?: {
+      effort?: string;
+      summary?: 'auto' | 'concise' | 'detailed';
+    }
+  ):
+    | {
+        effort?: string;
+        summary?: 'auto' | 'concise' | 'detailed';
+      }
+    | undefined {
+    if (!modelReasoning && !callReasoning) {
+      return undefined;
+    }
+
+    return {
+      ...(modelReasoning || {}),
+      ...(callReasoning || {}),
+    };
+  }
+
+  /**
+   * Builds the reasoning configuration object for the API request.
+   * Only includes properties that are actually set.
+   */
+  private buildReasoningConfig(reasoning?: {
+    effort?: string;
+    summary?: 'auto' | 'concise' | 'detailed';
+  }):
+    | { effort?: string; summary?: 'auto' | 'concise' | 'detailed' }
+    | undefined {
+    if (!reasoning) {
+      return undefined;
+    }
+
+    const hasEffort = Boolean(reasoning.effort);
+    const hasSummary = Boolean(reasoning.summary);
+
+    if (!hasEffort && !hasSummary) {
+      return undefined;
+    }
+
+    const result: {
+      effort?: string;
+      summary?: 'auto' | 'concise' | 'detailed';
+    } = {};
+
+    if (hasEffort && reasoning.effort) {
+      result.effort = reasoning.effort;
+    }
+
+    if (hasSummary && reasoning.summary) {
+      result.summary = reasoning.summary;
+    }
+
+    return result;
+  }
+
+  /**
+   * Prepares arguments for API requests by merging model settings with call options.
+   */
   private async getArgs({
     maxOutputTokens,
     temperature,
@@ -249,16 +328,10 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     const warnings: SharedV3Warning[] = [];
 
     // Merge model-level settings with call-level options
-    // Deep merge reasoning object if either exists
-    const modelReasoning = this.settings?.providerOptions?.reasoning;
-    const callReasoning = providerOptions?.reasoning;
-    const mergedReasoning =
-      modelReasoning || callReasoning
-        ? {
-            ...(modelReasoning || {}),
-            ...(callReasoning || {}),
-          }
-        : undefined;
+    const mergedReasoning = this.mergeReasoningOptions(
+      this.settings?.providerOptions?.reasoning,
+      providerOptions?.reasoning
+    );
 
     const mergedProviderOptions = {
       ...(this.settings?.providerOptions || {}),
@@ -266,23 +339,16 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       ...(mergedReasoning ? { reasoning: mergedReasoning } : {}),
     };
 
-    // Use mergedProviderOptions directly if parseProviderOptions strips reasoning
-    // Check if reasoning exists in mergedProviderOptions before parsing
-    const hasReasoningInMerged =
-      mergedProviderOptions.reasoning &&
-      (mergedProviderOptions.reasoning.effort ||
-        mergedProviderOptions.reasoning.summary);
-
     const nordlysOptions = await parseProviderOptions({
       provider: 'nordlys',
       providerOptions: mergedProviderOptions,
       schema: nordlysProviderOptions,
     });
 
-    // Ensure nordlysOptions exists and restore reasoning if it was stripped
+    // Ensure nordlysOptions exists and restore reasoning if it was stripped by parseProviderOptions
     const finalNordlysOptions = nordlysOptions || {};
-    if (hasReasoningInMerged && mergedProviderOptions.reasoning) {
-      finalNordlysOptions.reasoning = mergedProviderOptions.reasoning;
+    if (mergedReasoning && !finalNordlysOptions.reasoning) {
+      finalNordlysOptions.reasoning = mergedReasoning;
     }
 
     const {
@@ -313,37 +379,28 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       top_p: topP,
       tools: nordlysTools,
       tool_choice: nordlysToolChoice,
-      ...(finalNordlysOptions.user ? { user: finalNordlysOptions.user } : {}),
-      ...(finalNordlysOptions.metadata
-        ? { metadata: finalNordlysOptions.metadata }
-        : {}),
-      ...(finalNordlysOptions.parallel_tool_calls !== undefined
-        ? { parallel_tool_calls: finalNordlysOptions.parallel_tool_calls }
-        : {}),
-      // Use reasoning from finalNordlysOptions if it exists
-      ...(finalNordlysOptions.reasoning &&
-      (finalNordlysOptions.reasoning.effort ||
-        finalNordlysOptions.reasoning.summary)
-        ? {
-            reasoning: {
-              ...(finalNordlysOptions.reasoning.effort
-                ? { effort: finalNordlysOptions.reasoning.effort }
-                : {}),
-              ...(finalNordlysOptions.reasoning.summary
-                ? { summary: finalNordlysOptions.reasoning.summary }
-                : {}),
-            },
-          }
-        : {}),
-      ...(finalNordlysOptions.service_tier
-        ? { service_tier: finalNordlysOptions.service_tier }
-        : {}),
-      ...(finalNordlysOptions.store !== undefined
-        ? { store: finalNordlysOptions.store }
-        : {}),
-      ...(finalNordlysOptions.max_tool_calls !== undefined
-        ? { max_tool_calls: finalNordlysOptions.max_tool_calls }
-        : {}),
+      ...(finalNordlysOptions.user && { user: finalNordlysOptions.user }),
+      ...(finalNordlysOptions.metadata && {
+        metadata: finalNordlysOptions.metadata,
+      }),
+      ...(finalNordlysOptions.parallel_tool_calls !== undefined && {
+        parallel_tool_calls: finalNordlysOptions.parallel_tool_calls,
+      }),
+      ...(() => {
+        const reasoningConfig = this.buildReasoningConfig(
+          finalNordlysOptions.reasoning
+        );
+        return reasoningConfig ? { reasoning: reasoningConfig } : {};
+      })(),
+      ...(finalNordlysOptions.service_tier && {
+        service_tier: finalNordlysOptions.service_tier,
+      }),
+      ...(finalNordlysOptions.store !== undefined && {
+        store: finalNordlysOptions.store,
+      }),
+      ...(finalNordlysOptions.max_tool_calls !== undefined && {
+        max_tool_calls: finalNordlysOptions.max_tool_calls,
+      }),
     };
 
     return {
@@ -352,6 +409,11 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     };
   }
 
+  /**
+   * Generates a completion for the given prompt.
+   * @param options - Call options including prompt, temperature, max tokens, etc.
+   * @returns Promise resolving to the generation result with content, usage, and metadata
+   */
   async doGenerate(
     options: LanguageModelV3CallOptions
   ): Promise<LanguageModelV3GenerateResult> {
@@ -403,10 +465,25 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     let hasFunctionCall = false;
 
     // map response content to content array (defined when there is no error)
-    for (const part of response.output) {
+    // Type assertion is safe here because we validate the response schema
+    for (const part of response.output as Array<
+      | {
+          type: 'reasoning';
+          id: string;
+          summary: Array<{ text: string; type: string }>;
+          encrypted_content?: string | null;
+        }
+      | {
+          type: 'message';
+          id: string;
+          content: Array<{ text: string; type: string }>;
+        }
+      | { type: 'function_call'; id: string; name: string; arguments: string }
+    >) {
       switch (part.type) {
         case 'reasoning': {
-          // when there are no summary parts, we need to add an empty reasoning part:
+          // When there are no summary parts, add an empty reasoning part to ensure
+          // at least one reasoning content item is present
           if (part.summary.length === 0) {
             part.summary.push({ type: 'summary_text', text: '' });
           }
@@ -490,10 +567,15 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       finishReason: {
         unified: mapNordlysFinishReason({
           finishReason:
-            response.status === 'incomplete' ? 'max_output_tokens' : null,
+            response.status === RESPONSE_STATUS.INCOMPLETE
+              ? 'max_output_tokens'
+              : null,
           hasFunctionCall,
         }),
-        raw: response.status === 'incomplete' ? 'max_output_tokens' : undefined,
+        raw:
+          response.status === RESPONSE_STATUS.INCOMPLETE
+            ? 'max_output_tokens'
+            : undefined,
       },
       usage: convertNordlysResponsesUsage(usage),
       request: { body },
@@ -509,6 +591,11 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
     };
   }
 
+  /**
+   * Streams a completion for the given prompt.
+   * @param options - Call options including prompt, temperature, max tokens, etc.
+   * @returns Promise resolving to a stream result with a readable stream of content parts
+   */
   async doStream(
     options: LanguageModelV3CallOptions
   ): Promise<LanguageModelV3StreamResult> {
@@ -748,13 +835,13 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
               finishReason = {
                 unified: mapNordlysFinishReason({
                   finishReason:
-                    value.response.status === 'incomplete'
+                    value.response.status === RESPONSE_STATUS.INCOMPLETE
                       ? 'max_output_tokens'
                       : null,
                   hasFunctionCall,
                 }),
                 raw:
-                  value.response.status === 'incomplete'
+                  value.response.status === RESPONSE_STATUS.INCOMPLETE
                     ? 'max_output_tokens'
                     : undefined,
               };
