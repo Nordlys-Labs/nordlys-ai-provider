@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.11
+
+### Patch Changes
+
+- 3d5ee4d: remove duplicate end events by cleaning up active sets and simplifying flush
+
 ## 1.1.10
 
 ### Patch Changes
