@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.9
+
+### Patch Changes
+
+- 672a108: update nordlys-chat-language-model and nordlys-responses-types
+
 ## 1.1.8
 
 ### Patch Changes
