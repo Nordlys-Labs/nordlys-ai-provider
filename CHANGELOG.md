@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1
+
+### Patch Changes
+
+- f8db89a: allow usage to be nullish
+
 ## 1.1.0
 
 ### Minor Changes
