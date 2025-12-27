@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+
+### Minor Changes
+
+- 0001cd9: remove openai specific infra options and consolidate reasoning options
+
 ## 1.0.0
 
 ### Major Changes
