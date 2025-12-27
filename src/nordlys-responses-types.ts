@@ -413,6 +413,8 @@ export type NordlysResponseStreamEventUnion =
   | NordlysResponseReasoningTextDeltaEvent
   | NordlysResponseFunctionCallArgumentsDeltaEvent
   | NordlysResponseFunctionCallArgumentsDoneEvent
+  | NordlysResponseContentPartAddedEvent
+  | NordlysResponseContentPartDoneEvent
   | NordlysResponseCompletedEvent
   | NordlysResponseErrorEvent;
 
@@ -499,6 +501,58 @@ export interface NordlysResponseFunctionCallArgumentsDoneEvent {
 export interface NordlysResponseCompletedEvent {
   type: 'response.completed';
   response: NordlysResponse;
+}
+
+/**
+ * Content part added event
+ */
+export interface NordlysResponseContentPartAddedEvent {
+  type: 'response.content_part.added';
+  content_index: number;
+  item_id: string;
+  output_index: number;
+  part:
+    | {
+        type: 'output_text';
+        text: string;
+        annotations?: unknown[];
+        logprobs?: unknown[];
+      }
+    | {
+        type: 'refusal';
+        refusal: string;
+      }
+    | {
+        type: 'reasoning_text';
+        text: string;
+      };
+  sequence_number: number;
+}
+
+/**
+ * Content part done event
+ */
+export interface NordlysResponseContentPartDoneEvent {
+  type: 'response.content_part.done';
+  content_index: number;
+  item_id: string;
+  output_index: number;
+  part:
+    | {
+        type: 'output_text';
+        text: string;
+        annotations?: unknown[];
+        logprobs?: unknown[];
+      }
+    | {
+        type: 'refusal';
+        refusal: string;
+      }
+    | {
+        type: 'reasoning_text';
+        text: string;
+      };
+  sequence_number: number;
 }
 
 /**

@@ -241,6 +241,52 @@ const nordlysResponseStreamEventSchema = z.union([
     output_index: z.number(),
   }),
   z.object({
+    type: z.literal('response.content_part.added'),
+    content_index: z.number(),
+    item_id: z.string(),
+    output_index: z.number(),
+    part: z.discriminatedUnion('type', [
+      z.object({
+        type: z.literal('output_text'),
+        text: z.string(),
+        annotations: z.array(z.any()).optional(),
+        logprobs: z.array(z.any()).optional(),
+      }),
+      z.object({
+        type: z.literal('refusal'),
+        refusal: z.string(),
+      }),
+      z.object({
+        type: z.literal('reasoning_text'),
+        text: z.string(),
+      }),
+    ]),
+    sequence_number: z.number(),
+  }),
+  z.object({
+    type: z.literal('response.content_part.done'),
+    content_index: z.number(),
+    item_id: z.string(),
+    output_index: z.number(),
+    part: z.discriminatedUnion('type', [
+      z.object({
+        type: z.literal('output_text'),
+        text: z.string(),
+        annotations: z.array(z.any()).optional(),
+        logprobs: z.array(z.any()).optional(),
+      }),
+      z.object({
+        type: z.literal('refusal'),
+        refusal: z.string(),
+      }),
+      z.object({
+        type: z.literal('reasoning_text'),
+        text: z.string(),
+      }),
+    ]),
+    sequence_number: z.number(),
+  }),
+  z.object({
     type: z.literal('response.completed'),
     response: nordlysResponseSchema,
   }),
