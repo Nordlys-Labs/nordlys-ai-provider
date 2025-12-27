@@ -90,7 +90,13 @@ describe('parseNordlysStreamEvent', () => {
         item: {
           type: 'reasoning',
           id: 'reasoning-1',
-          text: 'Reasoning',
+          summary: [],
+          content: [
+            {
+              text: 'Reasoning',
+              type: 'reasoning_text',
+            },
+          ],
           status: 'completed',
         },
         output_index: 0,

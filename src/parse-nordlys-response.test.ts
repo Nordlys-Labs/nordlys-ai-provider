@@ -41,7 +41,13 @@ describe('parseNordlysResponse', () => {
         {
           type: 'reasoning',
           id: 'reasoning-1',
-          text: 'This is reasoning',
+          summary: [],
+          content: [
+            {
+              text: 'This is reasoning',
+              type: 'reasoning_text',
+            },
+          ],
           status: 'completed',
         },
       ],
@@ -106,7 +112,13 @@ describe('parseNordlysResponse', () => {
         {
           type: 'reasoning',
           id: 'reasoning-1',
-          text: 'Reasoning',
+          summary: [],
+          content: [
+            {
+              text: 'Reasoning',
+              type: 'reasoning_text',
+            },
+          ],
           status: 'completed',
         },
         {

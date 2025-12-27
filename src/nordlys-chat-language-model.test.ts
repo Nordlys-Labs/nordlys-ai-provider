@@ -53,7 +53,13 @@ describe('nordlysChatLanguageModel', () => {
         {
           type: 'reasoning' as const,
           id: 'reasoning-1',
-          text: 'This is reasoning',
+          summary: [],
+          content: [
+            {
+              text: 'This is reasoning',
+              type: 'reasoning_text',
+            },
+          ],
           status: 'completed' as const,
         },
         {

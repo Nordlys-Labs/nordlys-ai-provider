@@ -81,8 +81,22 @@ const nordlysResponseSchema = z.object({
       z.object({
         type: z.literal('reasoning'),
         id: z.string(),
-        text: z.string(),
-        status: z.enum(['in_progress', 'completed', 'incomplete']),
+        summary: z.array(
+          z.object({
+            text: z.string(),
+            type: z.string(),
+          })
+        ),
+        content: z
+          .array(
+            z.object({
+              text: z.string(),
+              type: z.string(),
+            })
+          )
+          .optional(),
+        encrypted_content: z.string().nullable().optional(),
+        status: z.enum(['in_progress', 'completed', 'incomplete']).optional(),
       }),
       z.object({
         type: z.literal('function_call'),
@@ -170,8 +184,22 @@ const nordlysResponseStreamEventSchema = z.union([
       z.object({
         type: z.literal('reasoning'),
         id: z.string(),
-        text: z.string(),
-        status: z.enum(['in_progress', 'completed', 'incomplete']),
+        summary: z.array(
+          z.object({
+            text: z.string(),
+            type: z.string(),
+          })
+        ),
+        content: z
+          .array(
+            z.object({
+              text: z.string(),
+              type: z.string(),
+            })
+          )
+          .optional(),
+        encrypted_content: z.string().nullable().optional(),
+        status: z.enum(['in_progress', 'completed', 'incomplete']).optional(),
       }),
       z.object({
         type: z.literal('function_call'),

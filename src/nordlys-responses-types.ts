@@ -314,8 +314,16 @@ export interface NordlysResponseRefusal {
 export interface NordlysResponseReasoningItem {
   type: 'reasoning';
   id: string;
-  text: string;
-  status: 'in_progress' | 'completed' | 'incomplete';
+  summary: Array<{
+    text: string;
+    type: string;
+  }>;
+  content?: Array<{
+    text: string;
+    type: string;
+  }>;
+  encrypted_content?: string | null;
+  status?: 'in_progress' | 'completed' | 'incomplete';
 }
 
 /**

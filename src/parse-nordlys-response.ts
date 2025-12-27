@@ -43,12 +43,17 @@ export function parseNordlysResponse(
         break;
       }
       case 'reasoning': {
-        // Extract reasoning text
+        // Extract reasoning text from content array
         const reasoning = item as NordlysResponseReasoningItem;
-        content.push({
-          type: 'reasoning',
-          text: reasoning.text,
-        });
+        // Combine all reasoning text from content array
+        const reasoningText =
+          reasoning.content?.map((c) => c.text).join('') || '';
+        if (reasoningText) {
+          content.push({
+            type: 'reasoning',
+            text: reasoningText,
+          });
+        }
         break;
       }
       case 'function_call': {
