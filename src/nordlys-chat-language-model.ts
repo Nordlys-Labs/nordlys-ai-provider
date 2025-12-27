@@ -813,6 +813,8 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                     },
                   },
                 });
+                // Remove from activeTextItems to prevent duplicate text-end in flush
+                streamParseState.activeTextItems.delete(itemId);
               } else if (itemType === 'reasoning') {
                 const activeReasoningPart = activeReasoning[itemId];
 
@@ -860,6 +862,8 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                   type: 'tool-input-end',
                   id: toolCallId,
                 });
+                // Remove from activeToolCalls to prevent duplicate tool-input-end in flush
+                streamParseState.activeToolCalls.delete(toolCallId);
 
                 const toolCall = getCompletedToolCall(
                   toolCallId,
@@ -1056,6 +1060,8 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                   type: 'text-end',
                   id: result.itemId,
                 });
+                // Remove from activeTextItems to prevent duplicate text-end in flush
+                streamParseState.activeTextItems.delete(result.itemId);
               }
 
               if (result.shouldEmitReasoningEnd && result.reasoningItemId) {
@@ -1068,6 +1074,8 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                 type: 'tool-input-end',
                 id: value.item_id,
               });
+              // Remove from activeToolCalls to prevent duplicate tool-input-end in flush
+              streamParseState.activeToolCalls.delete(value.item_id);
 
               const toolCall = getCompletedToolCall(
                 value.item_id,
@@ -1093,61 +1101,26 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
           },
 
           flush(controller) {
-            try {
-              // End any active text items
-              for (const itemId of streamParseState.activeTextItems) {
-                controller.enqueue({ type: 'text-end', id: itemId });
-              }
+            // Ensure providerMetadata structure is always valid
+            // Always include responseId (even if null) to match expected structure
+            const providerMetadata: SharedV3ProviderMetadata = {
+              [providerKey]: {
+                responseId,
+              },
+            };
 
-              // End any active reasoning items
-              for (const itemId of streamParseState.activeReasoningItems) {
-                controller.enqueue({
-                  type: 'reasoning-end',
-                  id: itemId,
-                  providerMetadata: {
-                    [providerKey]: { itemId },
-                  },
-                });
-              }
-
-              // End any active tool calls
-              for (const toolCallId of streamParseState.activeToolCalls) {
-                controller.enqueue({ type: 'tool-input-end', id: toolCallId });
-              }
-
-              // Ensure providerMetadata structure is always valid
-              // Always include responseId (even if null) to match expected structure
-              const providerMetadata: SharedV3ProviderMetadata = {
-                [providerKey]: {
-                  responseId,
-                },
-              };
-
-              // Only set serviceTier if the metadata object exists and is valid
-              // Add defensive check to prevent accessing properties on undefined
-              if (serviceTier !== undefined && providerMetadata[providerKey]) {
-                providerMetadata[providerKey].serviceTier = serviceTier;
-              }
-
-              controller.enqueue({
-                type: 'finish',
-                finishReason,
-                usage: convertNordlysResponsesUsage(usage),
-                providerMetadata,
-              });
-            } catch {
-              // Ensure finish event is always emitted even if there are errors during cleanup
-              controller.enqueue({
-                type: 'finish',
-                finishReason: { unified: 'error', raw: undefined },
-                usage: convertNordlysResponsesUsage(usage),
-                providerMetadata: {
-                  [providerKey]: {
-                    responseId,
-                  },
-                },
-              });
+            // Only set serviceTier if the metadata object exists and is valid
+            // Add defensive check to prevent accessing properties on undefined
+            if (serviceTier !== undefined && providerMetadata[providerKey]) {
+              providerMetadata[providerKey].serviceTier = serviceTier;
             }
+
+            controller.enqueue({
+              type: 'finish',
+              finishReason,
+              usage: convertNordlysResponsesUsage(usage),
+              providerMetadata,
+            });
           },
         })
       ),
