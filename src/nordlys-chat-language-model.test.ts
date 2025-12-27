@@ -53,13 +53,13 @@ describe('nordlysChatLanguageModel', () => {
         {
           type: 'reasoning' as const,
           id: 'reasoning-1',
-          summary: [],
-          content: [
+          summary: [
             {
               text: 'This is reasoning',
-              type: 'reasoning_text',
+              type: 'summary_text',
             },
           ],
+          encrypted_content: null,
           status: 'completed' as const,
         },
         {
@@ -114,16 +114,35 @@ describe('nordlysChatLanguageModel', () => {
     });
 
     expect(result.content).toHaveLength(3);
-    expect(result.content[0]).toEqual({ type: 'text', text: 'Hello world' });
+    expect(result.content[0]).toEqual({
+      type: 'text',
+      text: 'Hello world',
+      providerMetadata: {
+        nordlys: {
+          itemId: 'msg-1',
+        },
+      },
+    });
     expect(result.content[1]).toEqual({
       type: 'reasoning',
       text: 'This is reasoning',
+      providerMetadata: {
+        nordlys: {
+          itemId: 'reasoning-1',
+          reasoningEncryptedContent: null,
+        },
+      },
     });
     expect(result.content[2]).toEqual({
       type: 'tool-call',
       toolCallId: 'call-1',
       toolName: 'test_tool',
       input: '{"param": "value"}',
+      providerMetadata: {
+        nordlys: {
+          itemId: 'call-1',
+        },
+      },
     });
 
     expect(result.usage).toEqual({
@@ -137,6 +156,17 @@ describe('nordlysChatLanguageModel', () => {
         total: 20,
         text: 15,
         reasoning: 5,
+      },
+      raw: {
+        input_tokens: 10,
+        output_tokens: 20,
+        total_tokens: 30,
+        input_tokens_details: {
+          cached_tokens: 2,
+        },
+        output_tokens_details: {
+          reasoning_tokens: 5,
+        },
       },
     });
 

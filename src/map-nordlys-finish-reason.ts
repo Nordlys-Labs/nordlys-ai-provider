@@ -1,25 +1,22 @@
 import type { LanguageModelV3FinishReason } from '@ai-sdk/provider';
 
-/**
- * Maps Nordlys Responses API status field to AI SDK finish reason
- */
-export function mapNordlysFinishReason(
-  status?: string
-): LanguageModelV3FinishReason {
-  switch (status) {
-    case 'completed':
-      return { unified: 'stop', raw: undefined };
-    case 'incomplete':
-      return { unified: 'length', raw: undefined };
-    case 'failed':
-      return { unified: 'error', raw: undefined };
-    case 'cancelled':
-      return { unified: 'other', raw: 'cancelled' };
-    case 'queued':
-    case 'in_progress':
-      // These are intermediate states, treat as 'other'
-      return { unified: 'other', raw: status };
+export function mapNordlysFinishReason({
+  finishReason,
+  hasFunctionCall,
+}: {
+  finishReason: string | null | undefined;
+  // flag that checks if there have been client-side tool calls (not executed by provider)
+  hasFunctionCall: boolean;
+}): LanguageModelV3FinishReason['unified'] {
+  switch (finishReason) {
+    case undefined:
+    case null:
+      return hasFunctionCall ? 'tool-calls' : 'stop';
+    case 'max_output_tokens':
+      return 'length';
+    case 'content_filter':
+      return 'content-filter';
     default:
-      return { unified: 'other', raw: status };
+      return hasFunctionCall ? 'tool-calls' : 'other';
   }
 }

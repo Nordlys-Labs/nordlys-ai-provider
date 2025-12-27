@@ -2,56 +2,48 @@ import { describe, expect, it } from 'vitest';
 import { mapNordlysFinishReason } from './map-nordlys-finish-reason';
 
 describe('mapNordlysFinishReason', () => {
-  it('should map completed to stop', () => {
-    expect(mapNordlysFinishReason('completed')).toEqual({
-      unified: 'stop',
-      raw: undefined,
-    });
+  it('should map null to stop when no function calls', () => {
+    expect(
+      mapNordlysFinishReason({ finishReason: null, hasFunctionCall: false })
+    ).toBe('stop');
   });
 
-  it('should map incomplete to length', () => {
-    expect(mapNordlysFinishReason('incomplete')).toEqual({
-      unified: 'length',
-      raw: undefined,
-    });
+  it('should map null to tool-calls when function calls exist', () => {
+    expect(
+      mapNordlysFinishReason({ finishReason: null, hasFunctionCall: true })
+    ).toBe('tool-calls');
   });
 
-  it('should map failed to error', () => {
-    expect(mapNordlysFinishReason('failed')).toEqual({
-      unified: 'error',
-      raw: undefined,
-    });
+  it('should map max_output_tokens to length', () => {
+    expect(
+      mapNordlysFinishReason({
+        finishReason: 'max_output_tokens',
+        hasFunctionCall: false,
+      })
+    ).toBe('length');
   });
 
-  it('should map cancelled to other', () => {
-    expect(mapNordlysFinishReason('cancelled')).toEqual({
-      unified: 'other',
-      raw: 'cancelled',
-    });
+  it('should map content_filter to content-filter', () => {
+    expect(
+      mapNordlysFinishReason({
+        finishReason: 'content_filter',
+        hasFunctionCall: false,
+      })
+    ).toBe('content-filter');
   });
 
-  it('should map queued to other', () => {
-    expect(mapNordlysFinishReason('queued')).toEqual({
-      unified: 'other',
-      raw: 'queued',
-    });
+  it('should map unknown to other when no function calls', () => {
+    expect(
+      mapNordlysFinishReason({
+        finishReason: 'unknown',
+        hasFunctionCall: false,
+      })
+    ).toBe('other');
   });
 
-  it('should map in_progress to other', () => {
-    expect(mapNordlysFinishReason('in_progress')).toEqual({
-      unified: 'other',
-      raw: 'in_progress',
-    });
-  });
-
-  it('should map unknown/undefined', () => {
-    expect(mapNordlysFinishReason('something-else')).toEqual({
-      unified: 'other',
-      raw: 'something-else',
-    });
-    expect(mapNordlysFinishReason(undefined)).toEqual({
-      unified: 'other',
-      raw: undefined,
-    });
+  it('should map unknown to tool-calls when function calls exist', () => {
+    expect(
+      mapNordlysFinishReason({ finishReason: 'unknown', hasFunctionCall: true })
+    ).toBe('tool-calls');
   });
 });
