@@ -143,6 +143,17 @@ const nordlysResponseStreamEventSchema = z.union([
     content_index: z.number(),
   }),
   z.object({
+    type: z.literal('response.output_text.done'),
+    item_id: z.string(),
+    content_index: z.number(),
+    output_index: z.number(),
+    text: z.string(),
+    logprobs: z.array(z.unknown()).optional(),
+    // Nordlys-specific optional fields
+    model: z.string().optional(),
+    sequence_number: z.number().optional(),
+  }),
+  z.object({
     type: z.literal('response.reasoning_text.delta'),
     delta: z.string(),
     item_id: z.string(),
@@ -865,6 +876,10 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                 id: itemId,
                 delta,
               });
+            } else if (value.type === 'response.output_text.done') {
+              // This event signals completion of output text with full text content.
+              // The streaming was already handled by delta events, so we don't need to emit
+              // any AI SDK events here. We just ensure the event is properly parsed.
             } else if (value.type === 'response.reasoning_text.delta') {
               const { delta, itemId } = handleReasoningDelta(
                 value,
