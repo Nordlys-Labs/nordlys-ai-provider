@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type {
   NordlysResponseCompletedEvent,
+  NordlysResponseContentPartAddedEvent,
+  NordlysResponseContentPartDoneEvent,
   NordlysResponseCreatedEvent,
   NordlysResponseFunctionCallArgumentsDeltaEvent,
   NordlysResponseOutputItemAddedEvent,
@@ -12,6 +14,8 @@ import {
   extractResponseMetadata,
   extractUsageFromCompleted,
   getCompletedToolCall,
+  handleContentPartAdded,
+  handleContentPartDone,
   handleFunctionCallArgumentsDelta,
   handleOutputItemAdded,
   handleReasoningDelta,
@@ -252,6 +256,198 @@ describe('parseNordlysStreamEvent', () => {
       const state = createStreamState();
 
       expect(getCompletedToolCall('call-1', state)).toBeNull();
+    });
+  });
+
+  describe('handleContentPartAdded', () => {
+    it('should handle output_text content part', () => {
+      const state = createStreamState();
+      const event: NordlysResponseContentPartAddedEvent = {
+        type: 'response.content_part.added',
+        content_index: 0,
+        item_id: 'msg-1',
+        output_index: 0,
+        part: {
+          type: 'output_text',
+          text: 'Hello',
+        },
+        sequence_number: 1,
+      };
+
+      const result = handleContentPartAdded(event, state);
+
+      expect(result.shouldEmitTextStart).toBe(true);
+      expect(result.shouldEmitTextDelta).toBe(true);
+      expect(result.textDelta).toBe('Hello');
+      expect(result.itemId).toBe('msg-1');
+      expect(state.activeTextItems.has('msg-1')).toBe(true);
+      expect(state.textBuffers.get('msg-1')).toBe('Hello');
+    });
+
+    it('should handle reasoning_text content part', () => {
+      const state = createStreamState();
+      const event: NordlysResponseContentPartAddedEvent = {
+        type: 'response.content_part.added',
+        content_index: 0,
+        item_id: 'reasoning-1',
+        output_index: 0,
+        part: {
+          type: 'reasoning_text',
+          text: 'Step 1',
+        },
+        sequence_number: 1,
+      };
+
+      const result = handleContentPartAdded(event, state);
+
+      expect(result.shouldEmitReasoningDelta).toBe(true);
+      expect(result.reasoningDelta).toBe('Step 1');
+      expect(result.reasoningItemId).toBe('reasoning-1');
+      expect(state.activeReasoningItems.has('reasoning-1')).toBe(true);
+      expect(state.reasoningBuffers.get('reasoning-1')).toBe('Step 1');
+    });
+
+    it('should handle refusal content part as text', () => {
+      const state = createStreamState();
+      const event: NordlysResponseContentPartAddedEvent = {
+        type: 'response.content_part.added',
+        content_index: 0,
+        item_id: 'msg-1',
+        output_index: 0,
+        part: {
+          type: 'refusal',
+          refusal: 'I cannot do that',
+        },
+        sequence_number: 1,
+      };
+
+      const result = handleContentPartAdded(event, state);
+
+      expect(result.shouldEmitTextStart).toBe(true);
+      expect(result.shouldEmitTextDelta).toBe(true);
+      expect(result.textDelta).toBe('I cannot do that');
+      expect(result.itemId).toBe('msg-1');
+      expect(state.activeTextItems.has('msg-1')).toBe(true);
+      expect(state.textBuffers.get('msg-1')).toBe('I cannot do that');
+    });
+
+    it('should accumulate text for multiple output_text parts', () => {
+      const state = createStreamState();
+      state.textBuffers.set('msg-1', 'Hello');
+      state.activeTextItems.add('msg-1');
+
+      const event: NordlysResponseContentPartAddedEvent = {
+        type: 'response.content_part.added',
+        content_index: 1,
+        item_id: 'msg-1',
+        output_index: 0,
+        part: {
+          type: 'output_text',
+          text: ' world',
+        },
+        sequence_number: 2,
+      };
+
+      const result = handleContentPartAdded(event, state);
+
+      expect(result.shouldEmitTextStart).toBe(false); // Already started
+      expect(result.shouldEmitTextDelta).toBe(true);
+      expect(result.textDelta).toBe(' world');
+      expect(state.textBuffers.get('msg-1')).toBe('Hello world');
+    });
+  });
+
+  describe('handleContentPartDone', () => {
+    it('should handle output_text content part done', () => {
+      const state = createStreamState();
+      state.activeTextItems.add('msg-1');
+      state.textBuffers.set('msg-1', 'Hello');
+
+      const event: NordlysResponseContentPartDoneEvent = {
+        type: 'response.content_part.done',
+        content_index: 0,
+        item_id: 'msg-1',
+        output_index: 0,
+        part: {
+          type: 'output_text',
+          text: ' world',
+        },
+        sequence_number: 1,
+      };
+
+      const result = handleContentPartDone(event, state);
+
+      expect(result.shouldEmitTextEnd).toBe(true);
+      expect(result.itemId).toBe('msg-1');
+      expect(state.textBuffers.get('msg-1')).toBe('Hello world');
+    });
+
+    it('should handle reasoning_text content part done', () => {
+      const state = createStreamState();
+      state.activeReasoningItems.add('reasoning-1');
+      state.reasoningBuffers.set('reasoning-1', 'Step 1');
+
+      const event: NordlysResponseContentPartDoneEvent = {
+        type: 'response.content_part.done',
+        content_index: 0,
+        item_id: 'reasoning-1',
+        output_index: 0,
+        part: {
+          type: 'reasoning_text',
+          text: ' Step 2',
+        },
+        sequence_number: 1,
+      };
+
+      const result = handleContentPartDone(event, state);
+
+      expect(result.shouldEmitReasoningEnd).toBe(true);
+      expect(result.reasoningItemId).toBe('reasoning-1');
+      expect(state.reasoningBuffers.get('reasoning-1')).toBe('Step 1 Step 2');
+    });
+
+    it('should handle refusal content part done as text', () => {
+      const state = createStreamState();
+      state.activeTextItems.add('msg-1');
+      state.textBuffers.set('msg-1', 'I cannot');
+
+      const event: NordlysResponseContentPartDoneEvent = {
+        type: 'response.content_part.done',
+        content_index: 0,
+        item_id: 'msg-1',
+        output_index: 0,
+        part: {
+          type: 'refusal',
+          refusal: ' do that',
+        },
+        sequence_number: 1,
+      };
+
+      const result = handleContentPartDone(event, state);
+
+      expect(result.shouldEmitTextEnd).toBe(true);
+      expect(result.itemId).toBe('msg-1');
+      expect(state.textBuffers.get('msg-1')).toBe('I cannot do that');
+    });
+
+    it('should not emit end for inactive items', () => {
+      const state = createStreamState();
+
+      const event: NordlysResponseContentPartDoneEvent = {
+        type: 'response.content_part.done',
+        content_index: 0,
+        item_id: 'msg-1',
+        output_index: 0,
+        part: {
+          type: 'output_text',
+          text: 'Hello',
+        },
+        sequence_number: 1,
+      };
+
+      const result = handleContentPartDone(event, state);
+
+      expect(result.shouldEmitTextEnd).toBe(false);
     });
   });
 

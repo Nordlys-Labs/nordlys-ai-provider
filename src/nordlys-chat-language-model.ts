@@ -29,6 +29,8 @@ import {
   extractResponseMetadata,
   extractUsageFromCompleted,
   getCompletedToolCall,
+  handleContentPartAdded,
+  handleContentPartDone,
   handleFunctionCallArgumentsDelta,
   handleOutputItemAdded,
   handleReasoningDelta,
@@ -801,6 +803,63 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                   toolName: toolCall.toolName,
                   input: toolCall.input,
                 });
+              }
+            }
+
+            // Handle response.content_part.added event
+            if (event.type === 'response.content_part.added') {
+              const result = handleContentPartAdded(event, streamParseState);
+
+              if (result.shouldEmitTextStart && result.itemId) {
+                controller.enqueue({
+                  type: 'text-start',
+                  id: result.itemId,
+                });
+              }
+
+              if (
+                result.shouldEmitTextDelta &&
+                result.textDelta &&
+                result.itemId
+              ) {
+                controller.enqueue({
+                  type: 'text-delta',
+                  id: result.itemId,
+                  delta: result.textDelta,
+                });
+              }
+
+              if (
+                result.shouldEmitReasoningDelta &&
+                result.reasoningDelta &&
+                result.reasoningItemId
+              ) {
+                // Emit reasoning delta (no start event needed as it's already handled)
+                controller.enqueue({
+                  type: 'reasoning-delta',
+                  id: result.reasoningItemId,
+                  delta: result.reasoningDelta,
+                });
+              }
+            }
+
+            // Handle response.content_part.done event
+            if (event.type === 'response.content_part.done') {
+              const result = handleContentPartDone(event, streamParseState);
+
+              if (result.shouldEmitTextEnd && result.itemId) {
+                controller.enqueue({
+                  type: 'text-end',
+                  id: result.itemId,
+                });
+              }
+
+              if (result.shouldEmitReasoningEnd && result.reasoningItemId) {
+                // Note: AI SDK doesn't have a reasoning-end event, so we just
+                // mark it as done in the state
+                streamParseState.activeReasoningItems.delete(
+                  result.reasoningItemId
+                );
               }
             }
           },

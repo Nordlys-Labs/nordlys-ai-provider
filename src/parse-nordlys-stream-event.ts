@@ -3,6 +3,8 @@
 // is done in the TransformStream in nordlys-chat-language-model.ts
 import type {
   NordlysResponseCompletedEvent,
+  NordlysResponseContentPartAddedEvent,
+  NordlysResponseContentPartDoneEvent,
   NordlysResponseCreatedEvent,
   NordlysResponseFunctionCallArgumentsDeltaEvent,
   NordlysResponseFunctionToolCall,
@@ -252,6 +254,180 @@ export function getCompletedToolCall(
     toolName: toolCall.name,
     input: toolCall.arguments,
   };
+}
+
+/**
+ * Handles content part added event
+ * Returns information about what AI SDK events should be emitted
+ */
+export function handleContentPartAdded(
+  event: NordlysResponseContentPartAddedEvent,
+  state: NordlysStreamState
+): {
+  shouldEmitTextStart: boolean;
+  shouldEmitTextDelta: boolean;
+  textDelta?: string;
+  itemId?: string;
+  shouldEmitReasoningDelta: boolean;
+  reasoningDelta?: string;
+  reasoningItemId?: string;
+} {
+  const result = {
+    shouldEmitTextStart: false,
+    shouldEmitTextDelta: false,
+    textDelta: undefined as string | undefined,
+    itemId: undefined as string | undefined,
+    shouldEmitReasoningDelta: false,
+    reasoningDelta: undefined as string | undefined,
+    reasoningItemId: undefined as string | undefined,
+  };
+
+  // Safely check if part exists
+  if (!event.part) {
+    return result;
+  }
+
+  const part = event.part;
+  const itemId = event.item_id;
+
+  switch (part.type) {
+    case 'output_text': {
+      // Ensure text item is active
+      if (!state.activeTextItems.has(itemId)) {
+        state.activeTextItems.add(itemId);
+        state.textBuffers.set(itemId, '');
+        result.shouldEmitTextStart = true;
+      }
+
+      // Update buffer and emit delta
+      const current = state.textBuffers.get(itemId) || '';
+      const updated = current + part.text;
+      state.textBuffers.set(itemId, updated);
+
+      result.shouldEmitTextDelta = true;
+      result.textDelta = part.text;
+      result.itemId = itemId;
+      break;
+    }
+    case 'reasoning_text': {
+      // Ensure reasoning item is active
+      if (!state.activeReasoningItems.has(itemId)) {
+        state.activeReasoningItems.add(itemId);
+        state.reasoningBuffers.set(itemId, '');
+      }
+
+      // Update buffer and emit delta
+      const current = state.reasoningBuffers.get(itemId) || '';
+      const updated = current + part.text;
+      state.reasoningBuffers.set(itemId, updated);
+
+      result.shouldEmitReasoningDelta = true;
+      result.reasoningDelta = part.text;
+      result.reasoningItemId = itemId;
+      break;
+    }
+    case 'refusal': {
+      // Handle refusal as text content
+      if (!state.activeTextItems.has(itemId)) {
+        state.activeTextItems.add(itemId);
+        state.textBuffers.set(itemId, '');
+        result.shouldEmitTextStart = true;
+      }
+
+      // Update buffer and emit delta
+      const current = state.textBuffers.get(itemId) || '';
+      const updated = current + part.refusal;
+      state.textBuffers.set(itemId, updated);
+
+      result.shouldEmitTextDelta = true;
+      result.textDelta = part.refusal;
+      result.itemId = itemId;
+      break;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Handles content part done event
+ * Returns information about what AI SDK events should be emitted
+ */
+export function handleContentPartDone(
+  event: NordlysResponseContentPartDoneEvent,
+  state: NordlysStreamState
+): {
+  shouldEmitTextEnd: boolean;
+  itemId?: string;
+  shouldEmitReasoningEnd: boolean;
+  reasoningItemId?: string;
+} {
+  const result = {
+    shouldEmitTextEnd: false,
+    itemId: undefined as string | undefined,
+    shouldEmitReasoningEnd: false,
+    reasoningItemId: undefined as string | undefined,
+  };
+
+  // Safely check if part exists
+  if (!event.part) {
+    return result;
+  }
+
+  const part = event.part;
+  const itemId = event.item_id;
+
+  switch (part.type) {
+    case 'output_text': {
+      // Update buffer with final text if needed
+      if (part.text) {
+        const current = state.textBuffers.get(itemId) || '';
+        const updated = current + part.text;
+        state.textBuffers.set(itemId, updated);
+      }
+
+      // Mark text item as done
+      if (state.activeTextItems.has(itemId)) {
+        result.shouldEmitTextEnd = true;
+        result.itemId = itemId;
+        // Note: We don't remove from activeTextItems here as it might be used
+        // for multiple content parts. The flush handler will clean up.
+      }
+      break;
+    }
+    case 'reasoning_text': {
+      // Update buffer with final text if needed
+      if (part.text) {
+        const current = state.reasoningBuffers.get(itemId) || '';
+        const updated = current + part.text;
+        state.reasoningBuffers.set(itemId, updated);
+      }
+
+      // Mark reasoning item as done
+      if (state.activeReasoningItems.has(itemId)) {
+        result.shouldEmitReasoningEnd = true;
+        result.reasoningItemId = itemId;
+      }
+      break;
+    }
+    case 'refusal': {
+      // Handle refusal as text content
+      if (part.refusal) {
+        const current = state.textBuffers.get(itemId) || '';
+        const updated = current + part.refusal;
+        state.textBuffers.set(itemId, updated);
+      }
+
+      // Mark text item as done
+      if (state.activeTextItems.has(itemId)) {
+        result.shouldEmitTextEnd = true;
+        result.itemId = itemId;
+      }
+      break;
+    }
+  }
+
+  return result;
 }
 
 /**
