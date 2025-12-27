@@ -206,6 +206,36 @@ const nordlysResponseStreamEventSchema = z.union([
     sequence_number: z.number(),
   }),
   z.object({
+    type: z.literal('response.reasoning_summary_part.added'),
+    item_id: z.string(),
+    summary_index: z.number(),
+    // Nordlys-specific optional fields
+    output_index: z.number().optional(),
+    model: z.string().optional(),
+    part: z
+      .object({
+        type: z.literal('summary_text'),
+        text: z.string(),
+      })
+      .optional(),
+    sequence_number: z.number().optional(),
+  }),
+  z.object({
+    type: z.literal('response.reasoning_summary_text.delta'),
+    item_id: z.string(),
+    summary_index: z.number(),
+    delta: z.string(),
+    // Nordlys-specific optional fields
+    output_index: z.number().optional(),
+  }),
+  z.object({
+    type: z.literal('response.reasoning_summary_part.done'),
+    item_id: z.string(),
+    summary_index: z.number(),
+    // Nordlys-specific optional fields
+    output_index: z.number().optional(),
+  }),
+  z.object({
     type: z.literal('response.completed'),
     response: nordlysResponseSchema,
   }),
@@ -324,6 +354,7 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
   }: LanguageModelV3CallOptions): Promise<{
     args: NordlysResponseRequest;
     warnings: SharedV3Warning[];
+    store: boolean;
   }> {
     const warnings: SharedV3Warning[] = [];
 
@@ -403,9 +434,12 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       }),
     };
 
+    const store = finalNordlysOptions.store ?? true;
+
     return {
       args,
       warnings,
+      store,
     };
   }
 
@@ -599,7 +633,7 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
   async doStream(
     options: LanguageModelV3CallOptions
   ): Promise<LanguageModelV3StreamResult> {
-    const { args: body, warnings } = await this.getArgs(options);
+    const { args: body, warnings, store } = await this.getArgs(options);
 
     const { responseHeaders, value: response } = await postJsonToApi({
       url: `${this.config.baseURL}/responses`,
@@ -831,6 +865,83 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                 id: itemId,
                 delta,
               });
+            } else if (value.type === 'response.reasoning_summary_part.added') {
+              // the first reasoning start is pushed in isResponseOutputItemAddedReasoningChunk
+              if (value.summary_index > 0) {
+                const activeReasoningPart = activeReasoning[value.item_id];
+                if (activeReasoningPart) {
+                  activeReasoningPart.summaryParts[value.summary_index] =
+                    'active';
+
+                  // since there is a new active summary part, we can conclude all can-conclude summary parts
+                  for (const summaryIndex of Object.keys(
+                    activeReasoningPart.summaryParts
+                  )) {
+                    if (
+                      activeReasoningPart.summaryParts[summaryIndex] ===
+                      'can-conclude'
+                    ) {
+                      controller.enqueue({
+                        type: 'reasoning-end',
+                        id: `${value.item_id}:${summaryIndex}`,
+                        providerMetadata: {
+                          [providerKey]: { itemId: value.item_id },
+                        },
+                      });
+                      activeReasoningPart.summaryParts[summaryIndex] =
+                        'concluded';
+                    }
+                  }
+
+                  controller.enqueue({
+                    type: 'reasoning-start',
+                    id: `${value.item_id}:${value.summary_index}`,
+                    providerMetadata: {
+                      [providerKey]: {
+                        itemId: value.item_id,
+                        reasoningEncryptedContent:
+                          activeReasoning[value.item_id]?.encryptedContent ??
+                          null,
+                      },
+                    },
+                  });
+                }
+              }
+            } else if (value.type === 'response.reasoning_summary_text.delta') {
+              controller.enqueue({
+                type: 'reasoning-delta',
+                id: `${value.item_id}:${value.summary_index}`,
+                delta: value.delta,
+                providerMetadata: {
+                  [providerKey]: {
+                    itemId: value.item_id,
+                  },
+                },
+              });
+            } else if (value.type === 'response.reasoning_summary_part.done') {
+              // when Nordlys stores the message data, we can immediately conclude the reasoning part
+              // since we do not need to send the encrypted content.
+              const activeReasoningPart = activeReasoning[value.item_id];
+              if (activeReasoningPart) {
+                if (store) {
+                  controller.enqueue({
+                    type: 'reasoning-end',
+                    id: `${value.item_id}:${value.summary_index}`,
+                    providerMetadata: {
+                      [providerKey]: { itemId: value.item_id },
+                    },
+                  });
+
+                  // mark the summary part as concluded
+                  activeReasoningPart.summaryParts[value.summary_index] =
+                    'concluded';
+                } else {
+                  // mark the summary part as can-conclude only
+                  // because we need to have a final summary part with the encrypted content
+                  activeReasoningPart.summaryParts[value.summary_index] =
+                    'can-conclude';
+                }
+              }
             } else if (isResponseFinishedChunk(value)) {
               finishReason = {
                 unified: mapNordlysFinishReason({
