@@ -132,8 +132,17 @@ const nordlysResponseStreamEventSchema = z.union([
   }),
   z.object({
     type: z.literal('response.output_item.done'),
-    item_id: z.string(),
+    item: z.object({
+      id: z.string(),
+      type: z.string(),
+      role: z.string().optional(),
+      status: z.string().optional(),
+      content: z.array(z.unknown()).optional(),
+    }),
     output_index: z.number(),
+    // Nordlys-specific optional fields
+    model: z.string().optional(),
+    sequence_number: z.number().optional(),
   }),
   z.object({
     type: z.literal('response.output_text.delta'),
@@ -784,20 +793,28 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                 }
               }
             } else if (isResponseOutputItemDoneChunk(value)) {
-              const itemType = itemTypes[value.item_id];
+              const itemId = value.item.id;
+
+              // Track item type from item object if we haven't tracked it yet
+              if (!itemTypes[itemId]) {
+                itemTypes[itemId] = value.item
+                  .type as NordlysResponseOutputItemUnion['type'];
+              }
+
+              const itemType = itemTypes[itemId];
 
               if (itemType === 'message') {
                 controller.enqueue({
                   type: 'text-end',
-                  id: value.item_id,
+                  id: itemId,
                   providerMetadata: {
                     [providerKey]: {
-                      itemId: value.item_id,
+                      itemId: itemId,
                     },
                   },
                 });
               } else if (itemType === 'reasoning') {
-                const activeReasoningPart = activeReasoning[value.item_id];
+                const activeReasoningPart = activeReasoning[itemId];
 
                 if (activeReasoningPart) {
                   // get all active or can-conclude summary parts' ids
@@ -813,16 +830,16 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                   for (const summaryIndex of summaryPartIndices) {
                     controller.enqueue({
                       type: 'reasoning-end',
-                      id: `${value.item_id}:${summaryIndex}`,
+                      id: `${itemId}:${summaryIndex}`,
                       providerMetadata: {
                         [providerKey]: {
-                          itemId: value.item_id,
+                          itemId: itemId,
                         },
                       },
                     });
                   }
 
-                  delete activeReasoning[value.item_id];
+                  delete activeReasoning[itemId];
                 }
               }
               // function_call items are handled via function_call_arguments.done

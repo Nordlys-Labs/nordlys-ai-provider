@@ -506,8 +506,16 @@ export interface NordlysResponseOutputItemAddedEvent {
  */
 export interface NordlysResponseOutputItemDoneEvent {
   type: 'response.output_item.done';
-  item_id: string;
+  item: {
+    id: string;
+    type: string;
+    role?: string;
+    status?: string;
+    content?: unknown[];
+  };
   output_index: number;
+  model?: string;
+  sequence_number?: number;
 }
 
 /**
