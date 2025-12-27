@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.5
+
+### Patch Changes
+
+- 2b8dcff: refactor: improve code quality and align with TypeScript best practices
+
 ## 1.1.4
 
 ### Patch Changes
