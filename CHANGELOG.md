@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.8
+
+### Patch Changes
+
+- 883da45: add support for response.output_text.done event
+
 ## 1.1.7
 
 ### Patch Changes
