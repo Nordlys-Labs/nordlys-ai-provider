@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.6
+
+### Patch Changes
+
+- 34680c5: feat(nordlys-ai-provider): add reasoning summary events support matching OpenAI implementation
+
 ## 1.1.5
 
 ### Patch Changes
