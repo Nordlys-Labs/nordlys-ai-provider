@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.10
+
+### Patch Changes
+
+- e198896: add defensive checks and error handling in flush function
+
 ## 1.1.9
 
 ### Patch Changes
