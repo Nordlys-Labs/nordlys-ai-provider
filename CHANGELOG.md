@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2
+
+### Patch Changes
+
+- 189b10d: Fix reasoning item schema to match OpenAI API structure
+
 ## 1.1.1
 
 ### Patch Changes
