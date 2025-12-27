@@ -72,9 +72,14 @@ export const nordlysProviderOptions = z.object({
     })
     .optional(),
   /**
-   * Reasoning effort level.
+   * Reasoning configuration options.
    */
-  reasoning_effort: z.string().optional(),
+  reasoning: z
+    .object({
+      effort: z.string().optional(),
+      summary: z.enum(['auto', 'concise', 'detailed']).optional(),
+    })
+    .optional(),
   /**
    * Response format parameter.
    */
@@ -134,6 +139,31 @@ export const nordlysProviderOptions = z.object({
         .optional(),
     })
     .optional(),
+  /**
+   * The maximum number of total calls to built-in tools that can be processed in a response.
+   * This maximum number applies across all built-in tool calls, not per individual tool.
+   */
+  max_tool_calls: z.number().optional(),
+  /**
+   * Whether to use strict JSON schema validation. Defaults to true.
+   */
+  strict_json_schema: z.boolean().optional(),
+  /**
+   * Controls the verbosity of the model's response. Lower values result in more concise responses,
+   * while higher values result in more verbose responses.
+   */
+  text_verbosity: z.enum(['low', 'medium', 'high']).optional(),
+  /**
+   * Specifies additional content to include in the response.
+   * Supported values: ['file_search_call.results'], ['message.output_text.logprobs'], etc.
+   */
+  include: z.array(z.string()).optional(),
+  /**
+   * The truncation strategy to use for the model response.
+   * 'auto': If the input exceeds the model's context window, truncate by dropping items from the beginning.
+   * 'disabled': If input will exceed context window, fail with 400 error.
+   */
+  truncation: z.enum(['auto', 'disabled']).optional(),
 });
 
 /**

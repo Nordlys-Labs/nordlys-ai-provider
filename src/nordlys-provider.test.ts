@@ -93,42 +93,50 @@ describe('nordlysProvider', () => {
     expect(model.modelId).toBe('nordlys/hypernova');
   });
 
-  it('should accept providerOptions with reasoning_effort in chat method', () => {
+  it('should accept providerOptions with reasoning in chat method', () => {
     const provider = createNordlys({
       apiKey: 'test-key',
       baseURL: 'https://example.com',
     });
     const model = provider.chat('nordlys/hypernova', {
       providerOptions: {
-        reasoning_effort: 'medium',
+        reasoning: {
+          effort: 'medium',
+          summary: 'auto',
+        },
       },
     });
     expect(model).toBeDefined();
     expect(model.modelId).toBe('nordlys/hypernova');
   });
 
-  it('should accept providerOptions with reasoning_effort in languageModel method', () => {
+  it('should accept providerOptions with reasoning in languageModel method', () => {
     const provider = createNordlys({
       apiKey: 'test-key',
       baseURL: 'https://example.com',
     });
     const model = provider.languageModel('nordlys/hypernova', {
       providerOptions: {
-        reasoning_effort: 'high',
+        reasoning: {
+          effort: 'high',
+        },
       },
     });
     expect(model).toBeDefined();
     expect(model.modelId).toBe('nordlys/hypernova');
   });
 
-  it('should accept providerOptions with reasoning_effort in provider function', () => {
+  it('should accept providerOptions with reasoning in provider function', () => {
     const provider = createNordlys({
       apiKey: 'test-key',
       baseURL: 'https://example.com',
     });
     const model = provider('nordlys/hypernova', {
       providerOptions: {
-        reasoning_effort: 'low',
+        reasoning: {
+          effort: 'low',
+          summary: 'detailed',
+        },
       },
     });
     expect(model).toBeDefined();

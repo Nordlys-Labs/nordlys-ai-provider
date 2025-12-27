@@ -212,6 +212,14 @@ export interface V2ChatCompletionStreamOptionsParam {
 }
 
 /**
+ * Reasoning configuration parameter
+ */
+export interface NordlysReasoningParam {
+  effort?: string;
+  summary?: 'auto' | 'concise' | 'detailed';
+}
+
+/**
  * Request payload for Nordlys Responses API
  */
 export interface NordlysResponseRequest {
@@ -224,6 +232,7 @@ export interface NordlysResponseRequest {
   top_p?: number;
   max_output_tokens?: number;
   max_completion_tokens?: number;
+  max_tool_calls?: number;
   stop?: string | string[];
   presence_penalty?: number;
   frequency_penalty?: number;
@@ -235,7 +244,7 @@ export interface NordlysResponseRequest {
   modalities?: string[];
   parallel_tool_calls?: boolean;
   prediction?: V2ChatCompletionPredictionContentParam;
-  reasoning_effort?: string;
+  reasoning?: NordlysReasoningParam;
   response_format?: V2ChatCompletionNewParamsResponseFormatUnion;
   seed?: number;
   service_tier?: string;
@@ -244,6 +253,10 @@ export interface NordlysResponseRequest {
   web_search_options?: V2ChatCompletionNewParamsWebSearchOptions;
   stream?: boolean;
   stream_options?: V2ChatCompletionStreamOptionsParam;
+  strict_json_schema?: boolean;
+  text_verbosity?: 'low' | 'medium' | 'high';
+  include?: string[];
+  truncation?: 'auto' | 'disabled';
 }
 
 // ============================================================================

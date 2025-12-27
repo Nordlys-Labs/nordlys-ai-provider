@@ -351,8 +351,17 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
       ...(nordlysOptions.prediction
         ? { prediction: nordlysOptions.prediction }
         : {}),
-      ...(nordlysOptions.reasoning_effort
-        ? { reasoning_effort: nordlysOptions.reasoning_effort }
+      ...(nordlysOptions.reasoning
+        ? {
+            reasoning: {
+              ...(nordlysOptions.reasoning.effort
+                ? { effort: nordlysOptions.reasoning.effort }
+                : {}),
+              ...(nordlysOptions.reasoning.summary
+                ? { summary: nordlysOptions.reasoning.summary }
+                : {}),
+            },
+          }
         : {}),
       ...(nordlysOptions.response_format
         ? { response_format: nordlysOptions.response_format }
@@ -371,6 +380,19 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
         : {}),
       ...(nordlysOptions.web_search_options
         ? { web_search_options: nordlysOptions.web_search_options }
+        : {}),
+      ...(nordlysOptions.max_tool_calls !== undefined
+        ? { max_tool_calls: nordlysOptions.max_tool_calls }
+        : {}),
+      ...(nordlysOptions.strict_json_schema !== undefined
+        ? { strict_json_schema: nordlysOptions.strict_json_schema }
+        : {}),
+      ...(nordlysOptions.text_verbosity
+        ? { text_verbosity: nordlysOptions.text_verbosity }
+        : {}),
+      ...(nordlysOptions.include ? { include: nordlysOptions.include } : {}),
+      ...(nordlysOptions.truncation
+        ? { truncation: nordlysOptions.truncation }
         : {}),
     };
 
