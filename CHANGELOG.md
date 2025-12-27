@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0
+
+### Major Changes
+
+- 1ad72f0: Migrate from chat completions to responses api
+
 ## 0.2.2
 
 ### Patch Changes
