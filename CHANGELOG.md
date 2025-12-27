@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.7
+
+### Patch Changes
+
+- 90aa241: feat: add support for response.reasoning_summary_text.done event
+
 ## 1.1.6
 
 ### Patch Changes
