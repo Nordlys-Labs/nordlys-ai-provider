@@ -15,14 +15,13 @@ export function prepareTools({
     | undefined
     | Array<{
         type: 'function';
-        function: {
-          name: string;
-          description: string | undefined;
-          parameters: unknown;
-        };
+        name: string;
+        description: string | undefined;
+        parameters: unknown;
+        strict?: boolean;
       }>;
   toolChoice:
-    | { type: 'function'; function: { name: string } }
+    | { type: 'function'; name: string }
     | 'auto'
     | 'none'
     | 'required'
@@ -40,11 +39,10 @@ export function prepareTools({
 
   const openaiCompatTools: Array<{
     type: 'function';
-    function: {
-      name: string;
-      description: string | undefined;
-      parameters: unknown;
-    };
+    name: string;
+    description: string | undefined;
+    parameters: unknown;
+    strict?: boolean;
   }> = [];
 
   for (const tool of tools) {
@@ -53,11 +51,10 @@ export function prepareTools({
     } else if (tool.type === 'function') {
       openaiCompatTools.push({
         type: 'function',
-        function: {
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.inputSchema,
-        },
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.inputSchema,
+        ...(tool.strict != null ? { strict: tool.strict } : {}),
       });
     }
   }
@@ -78,7 +75,7 @@ export function prepareTools({
         tools: openaiCompatTools,
         toolChoice: {
           type: 'function',
-          function: { name: toolChoice.toolName },
+          name: toolChoice.toolName,
         },
         toolWarnings,
       };

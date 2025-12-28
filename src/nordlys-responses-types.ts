@@ -11,20 +11,28 @@
  * Union type for all input items
  */
 export type NordlysResponseInputItemUnion =
-  | NordlysResponseInputItemMessage
+  | NordlysResponseInputSystemMessage
+  | NordlysResponseInputUserMessage
   | NordlysResponseInputAudio
   | NordlysResponseInputImage
   | NordlysResponseInputFile
   | NordlysResponseInputFunctionCallOutput;
 
 /**
- * Message input item
+ * System message input item (Responses API format - no type field, content is string)
  */
-export interface NordlysResponseInputItemMessage {
-  type: 'message';
-  role: 'user' | 'system' | 'developer';
+export type NordlysResponseInputSystemMessage = {
+  role: 'system' | 'developer';
+  content: string;
+};
+
+/**
+ * User message input item (Responses API format - no type field, content is array)
+ */
+export type NordlysResponseInputUserMessage = {
+  role: 'user';
   content: NordlysResponseInputContentUnion[];
-}
+};
 
 /**
  * Audio input item
@@ -38,33 +46,27 @@ export interface NordlysResponseInputAudio {
 }
 
 /**
- * Image input item
+ * Image input item (Responses API format)
  */
-export interface NordlysResponseInputImage {
-  type: 'input_image';
-  image_url: {
-    url: string;
-  };
-}
+export type NordlysResponseInputImage =
+  | { type: 'input_image'; image_url: string }
+  | { type: 'input_image'; file_id: string };
 
 /**
- * File input item
+ * File input item (Responses API format)
  */
-export interface NordlysResponseInputFile {
-  type: 'input_file';
-  file: {
-    filename: string;
-    file_data: string;
-  };
-}
+export type NordlysResponseInputFile =
+  | { type: 'input_file'; filename: string; file_data: string }
+  | { type: 'input_file'; file_url: string }
+  | { type: 'input_file'; file_id: string };
 
 /**
  * Function call output (for tool messages)
  */
 export interface NordlysResponseInputFunctionCallOutput {
   type: 'function_call_output';
-  function_call_id: string;
-  output: string;
+  call_id: string;
+  output: string | Array<{ type: string; [key: string]: unknown }>;
 }
 
 /**
@@ -85,22 +87,21 @@ export interface NordlysResponseInputText {
 }
 
 /**
- * Tool union type (same as chat completions)
+ * Tool union type (Responses API format - flat structure)
  */
 export type NordlysToolUnion = {
   type: 'function';
-  function: {
-    name: string;
-    description?: string;
-    parameters: unknown;
-  };
+  name: string;
+  description?: string;
+  parameters: unknown;
+  strict?: boolean;
 };
 
 /**
- * Tool choice union type (same as chat completions)
+ * Tool choice union type (Responses API format - flat structure)
  */
 export type NordlysToolChoiceUnion =
-  | { type: 'function'; function: { name: string } }
+  | { type: 'function'; name: string }
   | 'auto'
   | 'none'
   | 'required';

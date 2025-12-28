@@ -104,7 +104,7 @@ export function convertToNordlysResponseInput({
 
                   contentParts.push({
                     type: 'input_image',
-                    image_url: { url },
+                    image_url: url,
                   });
                   break;
                 }
@@ -155,10 +155,8 @@ export function convertToNordlysResponseInput({
 
                   contentParts.push({
                     type: 'input_file',
-                    file: {
-                      filename: part.filename ?? 'document.pdf',
-                      file_data: `data:application/pdf;base64,${base64Data}`,
-                    },
+                    filename: part.filename ?? 'document.pdf',
+                    file_data: `data:application/pdf;base64,${base64Data}`,
                   });
                   break;
                 }
@@ -179,7 +177,6 @@ export function convertToNordlysResponseInput({
 
         if (contentParts.length > 0) {
           inputItems.push({
-            type: 'message',
             role: 'user',
             content: contentParts,
           });
@@ -222,7 +219,6 @@ export function convertToNordlysResponseInput({
               'Assistant messages in multi-turn conversations are converted to user messages',
           });
           inputItems.push({
-            type: 'message',
             role: 'user',
             content: [{ type: 'input_text', text }],
           });
@@ -240,7 +236,7 @@ export function convertToNordlysResponseInput({
           if (contentValue) {
             inputItems.push({
               type: 'function_call_output',
-              function_call_id: toolResponse.toolCallId,
+              call_id: toolResponse.toolCallId,
               output: contentValue,
             });
           }
@@ -275,9 +271,8 @@ export function convertToNordlysResponseInput({
           ? systemMessages.length === 1
             ? systemMessages[0]
             : systemMessages.map((msg) => ({
-                type: 'message' as const,
                 role: 'system' as const,
-                content: [{ type: 'input_text' as const, text: msg }],
+                content: msg,
               }))
           : undefined,
       warnings,
@@ -291,9 +286,8 @@ export function convertToNordlysResponseInput({
         ? systemMessages.length === 1
           ? systemMessages[0]
           : systemMessages.map((msg) => ({
-              type: 'message' as const,
               role: 'system' as const,
-              content: [{ type: 'input_text' as const, text: msg }],
+              content: msg,
             }))
         : undefined,
     warnings,

@@ -24,7 +24,6 @@ describe('convertToNordlysResponseInput', () => {
     expect(Array.isArray(result.input)).toBe(true);
     if (Array.isArray(result.input)) {
       expect(result.input[0]).toMatchObject({
-        type: 'message',
         role: 'user',
       });
     }
@@ -66,10 +65,9 @@ describe('convertToNordlysResponseInput', () => {
     if (Array.isArray(result.input)) {
       const message = result.input[0];
       expect(message).toMatchObject({
-        type: 'message',
         role: 'user',
       });
-      if (message.type === 'message') {
+      if ('role' in message && message.role === 'user') {
         expect(message.content.length).toBe(2);
         expect(message.content[0]).toMatchObject({ type: 'input_text' });
         expect(message.content[1]).toMatchObject({ type: 'input_image' });
@@ -98,7 +96,7 @@ describe('convertToNordlysResponseInput', () => {
     if (Array.isArray(result.input)) {
       expect(result.input[0]).toMatchObject({
         type: 'function_call_output',
-        function_call_id: 'call-1',
+        call_id: 'call-1',
       });
     }
   });
