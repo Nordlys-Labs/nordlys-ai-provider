@@ -377,12 +377,12 @@ export function convertToNordlysResponseInput({
 
   // Return as array (must have at least one item or be a string)
   if (inputItems.length === 0) {
-    // No input items - this shouldn't happen but handle gracefully
-    return {
-      input: '',
-      instructions,
-      warnings,
-    };
+    // Invalid state: no input items found
+    // This should never happen in normal flow - fail fast with clear error
+    throw new Error(
+      'Cannot generate request: no valid input items found. ' +
+        'At least one input item (user message, system message, etc.) is required.'
+    );
   }
 
   return {
