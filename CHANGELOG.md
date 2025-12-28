@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.15
+
+### Patch Changes
+
+- 38b6190: ensure mutually exclusive image_url and file_id parameters
+
 ## 1.1.14
 
 ### Patch Changes
