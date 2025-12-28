@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.12
+
+### Patch Changes
+
+- fb868f0: remove text-start/text-end emissions from content_part events
+
 ## 1.1.11
 
 ### Patch Changes
