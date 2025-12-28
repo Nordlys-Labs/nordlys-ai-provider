@@ -16,6 +16,7 @@ export type NordlysResponseInputItemUnion =
   | NordlysResponseInputSystemMessage
   | NordlysResponseInputUserMessage
   | NordlysResponseInputAudio
+  | NordlysResponseInputFunctionCall
   | NordlysResponseInputFunctionCallOutput;
 
 /**
@@ -60,6 +61,16 @@ export type NordlysResponseInputFile =
   | { type: 'input_file'; filename: string; file_data: string }
   | { type: 'input_file'; file_url: string }
   | { type: 'input_file'; file_id: string };
+
+/**
+ * Function call input (for assistant messages with tool-calls)
+ */
+export interface NordlysResponseInputFunctionCall {
+  type: 'function_call';
+  call_id: string;
+  name: string;
+  arguments: string;
+}
 
 /**
  * Function call output (for tool messages)

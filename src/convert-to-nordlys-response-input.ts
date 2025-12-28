@@ -287,6 +287,7 @@ export function convertToNordlysResponseInput({
         // Convert assistant message for multi-turn conversations
         // Note: Responses API doesn't support assistant role in input
         // We'll convert assistant text to user message with context
+        // Tool-calls are extracted and added as function_call items
         const textParts: string[] = [];
 
         for (const part of content) {
@@ -295,8 +296,21 @@ export function convertToNordlysResponseInput({
               textParts.push(part.text);
               break;
             }
+            case 'tool-call': {
+              // Extract tool-calls and add as function_call items
+              // This ensures function_call_output items have corresponding function_call items
+              inputItems.push({
+                type: 'function_call',
+                call_id: part.toolCallId,
+                name: part.toolName,
+                arguments:
+                  typeof part.input === 'string'
+                    ? part.input
+                    : JSON.stringify(part.input),
+              });
+              break;
+            }
             case 'reasoning':
-            case 'tool-call':
             case 'file': {
               // These are not supported in input for assistant messages
               warnings.push({
