@@ -9,13 +9,13 @@
 
 /**
  * Union type for all input items
+ * Note: Images and files are NOT top-level input items - they're only content types
+ * within message content arrays. Audio is a separate top-level input item.
  */
 export type NordlysResponseInputItemUnion =
   | NordlysResponseInputSystemMessage
   | NordlysResponseInputUserMessage
   | NordlysResponseInputAudio
-  | NordlysResponseInputImage
-  | NordlysResponseInputFile
   | NordlysResponseInputFunctionCallOutput;
 
 /**
@@ -46,14 +46,15 @@ export interface NordlysResponseInputAudio {
 }
 
 /**
- * Image input item (Responses API format)
+ * Image content type (used in message content arrays, NOT as top-level input items)
+ * The detail field is optional and defaults to "auto" in the Go SDK
  */
 export type NordlysResponseInputImage =
-  | { type: 'input_image'; image_url: string }
-  | { type: 'input_image'; file_id: string };
+  | { type: 'input_image'; image_url: string; detail?: 'low' | 'high' | 'auto' }
+  | { type: 'input_image'; file_id: string; detail?: 'low' | 'high' | 'auto' };
 
 /**
- * File input item (Responses API format)
+ * File content type (used in message content arrays, NOT as top-level input items)
  */
 export type NordlysResponseInputFile =
   | { type: 'input_file'; filename: string; file_data: string }
@@ -71,12 +72,12 @@ export interface NordlysResponseInputFunctionCallOutput {
 
 /**
  * Union type for input content
+ * Note: Audio is NOT a content type - it's a separate input item
  */
 export type NordlysResponseInputContentUnion =
   | NordlysResponseInputText
   | NordlysResponseInputImage
-  | NordlysResponseInputFile
-  | NordlysResponseInputAudio;
+  | NordlysResponseInputFile;
 
 /**
  * Text input content
