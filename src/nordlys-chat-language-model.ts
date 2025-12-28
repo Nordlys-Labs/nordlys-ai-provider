@@ -40,14 +40,12 @@ import type {
 import type { NordlysResponseRequest } from './nordlys-types';
 import {
   createStreamState,
-  getCompletedToolCall,
   handleContentPartAdded,
   handleContentPartDone,
   handleFunctionCallArgumentsDelta,
   handleOutputItemAdded,
   handleReasoningDelta,
   handleTextDelta,
-  isToolCallComplete,
 } from './parse-nordlys-stream-event';
 
 interface NordlysChatConfig {
@@ -132,15 +130,24 @@ const nordlysResponseStreamEventSchema = z.union([
   }),
   z.object({
     type: z.literal('response.output_item.done'),
-    item: z.object({
-      id: z.string(),
-      type: z.string(),
-      role: z.string().optional(),
-      status: z.string().optional(),
-      content: z.array(z.unknown()).optional(),
-    }),
+    item: z.union([
+      z.object({
+        id: z.string().optional(),
+        type: z.literal('function_call'),
+        call_id: z.string(),
+        name: z.string(),
+        arguments: z.string(),
+        status: z.string().optional(),
+      }),
+      z.object({
+        id: z.string(),
+        type: z.string(),
+        role: z.string().optional(),
+        status: z.string().optional(),
+        content: z.array(z.unknown()).optional(),
+      }),
+    ]),
     output_index: z.number(),
-    // Nordlys-specific optional fields
     model: z.string().optional(),
     sequence_number: z.number().optional(),
   }),
@@ -171,11 +178,6 @@ const nordlysResponseStreamEventSchema = z.union([
   z.object({
     type: z.literal('response.function_call_arguments.delta'),
     delta: z.string(),
-    item_id: z.string(),
-    output_index: z.number(),
-  }),
-  z.object({
-    type: z.literal('response.function_call_arguments.done'),
     item_id: z.string(),
     output_index: z.number(),
   }),
@@ -745,17 +747,20 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
 
             if (isResponseOutputItemAddedChunk(value)) {
               // Track item type for later use in output_item.done
-              itemTypes[value.item.id] = value.item.type;
+              const itemId = value.item.id;
+              if (itemId) {
+                itemTypes[itemId] = value.item.type;
+              }
 
               if (value.item.type === 'function_call') {
                 ongoingToolCalls[value.output_index] = {
                   toolName: value.item.name,
-                  toolCallId: value.item.id,
+                  toolCallId: value.item.call_id,
                 };
 
                 controller.enqueue({
                   type: 'tool-input-start',
-                  id: value.item.id,
+                  id: value.item.call_id,
                   toolName: value.item.name,
                 });
               } else if (value.item.type === 'message') {
@@ -793,91 +798,92 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                 }
               }
             } else if (isResponseOutputItemDoneChunk(value)) {
-              const itemId = value.item.id;
+              if (isFunctionCallOutputItemDone(value)) {
+                const itemId = value.item.id ?? value.item.call_id;
+                if (itemId) {
+                  itemTypes[itemId] = 'function_call';
+                }
 
-              // Track item type from item object if we haven't tracked it yet
-              if (!itemTypes[itemId]) {
-                itemTypes[itemId] = value.item
-                  .type as NordlysResponseOutputItemUnion['type'];
-              }
+                ongoingToolCalls[value.output_index] = undefined;
+                hasFunctionCall = true;
 
-              const itemType = itemTypes[itemId];
-
-              if (itemType === 'message') {
                 controller.enqueue({
-                  type: 'text-end',
-                  id: itemId,
+                  type: 'tool-input-end',
+                  id: value.item.call_id,
+                });
+
+                controller.enqueue({
+                  type: 'tool-call',
+                  toolCallId: value.item.call_id,
+                  toolName: value.item.name,
+                  input: value.item.arguments,
                   providerMetadata: {
                     [providerKey]: {
-                      itemId: itemId,
+                      itemId,
                     },
                   },
                 });
-                // Remove from activeTextItems to prevent duplicate text-end in flush
-                streamParseState.activeTextItems.delete(itemId);
-              } else if (itemType === 'reasoning') {
-                const activeReasoningPart = activeReasoning[itemId];
+              } else {
+                const itemId = value.item.id;
+                if (itemId) {
+                  if (!itemTypes[itemId]) {
+                    itemTypes[itemId] = value.item
+                      .type as NordlysResponseOutputItemUnion['type'];
+                  }
 
-                if (activeReasoningPart) {
-                  // get all active or can-conclude summary parts' ids
-                  const summaryPartIndices = Object.entries(
-                    activeReasoningPart.summaryParts
-                  )
-                    .filter(
-                      ([_, status]) =>
-                        status === 'active' || status === 'can-conclude'
-                    )
-                    .map(([summaryIndex]) => summaryIndex);
+                  const itemType = itemTypes[itemId];
 
-                  for (const summaryIndex of summaryPartIndices) {
+                  if (itemType === 'message') {
                     controller.enqueue({
-                      type: 'reasoning-end',
-                      id: `${itemId}:${summaryIndex}`,
+                      type: 'text-end',
+                      id: itemId,
                       providerMetadata: {
                         [providerKey]: {
-                          itemId: itemId,
+                          itemId,
                         },
                       },
                     });
-                  }
+                    streamParseState.activeTextItems.delete(itemId);
+                  } else if (itemType === 'reasoning') {
+                    const activeReasoningPart = activeReasoning[itemId];
 
-                  delete activeReasoning[itemId];
+                    if (activeReasoningPart) {
+                      const summaryPartIndices = Object.entries(
+                        activeReasoningPart.summaryParts
+                      )
+                        .filter(
+                          ([_, status]) =>
+                            status === 'active' || status === 'can-conclude'
+                        )
+                        .map(([summaryIndex]) => summaryIndex);
+
+                      for (const summaryIndex of summaryPartIndices) {
+                        controller.enqueue({
+                          type: 'reasoning-end',
+                          id: `${itemId}:${summaryIndex}`,
+                          providerMetadata: {
+                            [providerKey]: {
+                              itemId,
+                            },
+                          },
+                        });
+                      }
+
+                      delete activeReasoning[itemId];
+                    }
+                  }
                 }
               }
-              // function_call items are handled via function_call_arguments.done
             } else if (isResponseFunctionCallArgumentsDeltaChunk(value)) {
-              const { delta, toolCallId } = handleFunctionCallArgumentsDelta(
-                value,
-                streamParseState
-              );
-              controller.enqueue({
-                type: 'tool-input-delta',
-                id: toolCallId,
-                delta,
-              });
+              const toolCall = ongoingToolCalls[value.output_index];
 
-              // Check if tool call is complete
-              if (isToolCallComplete(toolCallId, streamParseState)) {
+              if (toolCall != null) {
+                handleFunctionCallArgumentsDelta(value, streamParseState);
                 controller.enqueue({
-                  type: 'tool-input-end',
-                  id: toolCallId,
+                  type: 'tool-input-delta',
+                  id: toolCall.toolCallId,
+                  delta: value.delta,
                 });
-                // Remove from activeToolCalls to prevent duplicate tool-input-end in flush
-                streamParseState.activeToolCalls.delete(toolCallId);
-
-                const toolCall = getCompletedToolCall(
-                  toolCallId,
-                  streamParseState
-                );
-                if (toolCall) {
-                  hasFunctionCall = true;
-                  controller.enqueue({
-                    type: 'tool-call',
-                    toolCallId: toolCall.toolCallId,
-                    toolName: toolCall.toolName,
-                    input: toolCall.input,
-                  });
-                }
               }
             } else if (isResponseCreatedChunk(value)) {
               responseId = value.response.id;
@@ -1069,27 +1075,6 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                   result.reasoningItemId
                 );
               }
-            } else if (value.type === 'response.function_call_arguments.done') {
-              controller.enqueue({
-                type: 'tool-input-end',
-                id: value.item_id,
-              });
-              // Remove from activeToolCalls to prevent duplicate tool-input-end in flush
-              streamParseState.activeToolCalls.delete(value.item_id);
-
-              const toolCall = getCompletedToolCall(
-                value.item_id,
-                streamParseState
-              );
-              if (toolCall) {
-                hasFunctionCall = true;
-                controller.enqueue({
-                  type: 'tool-call',
-                  toolCallId: toolCall.toolCallId,
-                  toolName: toolCall.toolName,
-                  input: toolCall.input,
-                });
-              }
             } else if (isErrorChunk(value)) {
               finishReason = { unified: 'error', raw: undefined };
               controller.enqueue({
@@ -1101,19 +1086,12 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
           },
 
           flush(controller) {
-            // Ensure providerMetadata structure is always valid
-            // Always include responseId (even if null) to match expected structure
             const providerMetadata: SharedV3ProviderMetadata = {
               [providerKey]: {
                 responseId,
+                ...(serviceTier !== undefined && { serviceTier }),
               },
             };
-
-            // Only set serviceTier if the metadata object exists and is valid
-            // Add defensive check to prevent accessing properties on undefined
-            if (serviceTier !== undefined && providerMetadata[providerKey]) {
-              providerMetadata[providerKey].serviceTier = serviceTier;
-            }
 
             controller.enqueue({
               type: 'finish',
@@ -1142,6 +1120,18 @@ function isResponseOutputItemDoneChunk(
   chunk: NordlysResponseStreamEventUnion
 ): chunk is NordlysResponseOutputItemDoneEvent {
   return chunk.type === 'response.output_item.done';
+}
+
+/**
+ * Type guard for function_call items in output_item.done events
+ */
+function isFunctionCallOutputItemDone(
+  event: NordlysResponseOutputItemDoneEvent
+): event is Extract<
+  NordlysResponseOutputItemDoneEvent,
+  { item: { type: 'function_call' } }
+> {
+  return event.item.type === 'function_call';
 }
 
 function isResponseFinishedChunk(

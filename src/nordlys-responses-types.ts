@@ -329,14 +329,15 @@ export interface NordlysResponseReasoningItem {
 }
 
 /**
- * Function tool call output item
+ * Function tool call output item (OpenAI format)
  */
 export interface NordlysResponseFunctionToolCall {
   type: 'function_call';
-  id: string;
+  call_id: string;
+  id?: string;
   name: string;
   arguments: string;
-  status: 'in_progress' | 'completed' | 'incomplete';
+  status?: 'in_progress' | 'completed' | 'incomplete';
 }
 
 /**
@@ -465,7 +466,6 @@ export type NordlysResponseStreamEventUnion =
   | NordlysResponseOutputTextDoneEvent
   | NordlysResponseReasoningTextDeltaEvent
   | NordlysResponseFunctionCallArgumentsDeltaEvent
-  | NordlysResponseFunctionCallArgumentsDoneEvent
   | NordlysResponseContentPartAddedEvent
   | NordlysResponseContentPartDoneEvent
   | NordlysResponseReasoningSummaryPartAddedEvent
@@ -504,21 +504,36 @@ export interface NordlysResponseOutputItemAddedEvent {
 }
 
 /**
- * Output item done event
+ * Output item done event (OpenAI format)
  */
-export interface NordlysResponseOutputItemDoneEvent {
-  type: 'response.output_item.done';
-  item: {
-    id: string;
-    type: string;
-    role?: string;
-    status?: string;
-    content?: unknown[];
-  };
-  output_index: number;
-  model?: string;
-  sequence_number?: number;
-}
+export type NordlysResponseOutputItemDoneEvent =
+  | {
+      type: 'response.output_item.done';
+      item: {
+        id?: string;
+        type: 'function_call';
+        call_id: string;
+        name: string;
+        arguments: string;
+        status?: string;
+      };
+      output_index: number;
+      model?: string;
+      sequence_number?: number;
+    }
+  | {
+      type: 'response.output_item.done';
+      item: {
+        id: string;
+        type: Exclude<string, 'function_call'>;
+        role?: string;
+        status?: string;
+        content?: unknown[];
+      };
+      output_index: number;
+      model?: string;
+      sequence_number?: number;
+    };
 
 /**
  * Text delta event
@@ -561,15 +576,6 @@ export interface NordlysResponseReasoningTextDeltaEvent {
 export interface NordlysResponseFunctionCallArgumentsDeltaEvent {
   type: 'response.function_call_arguments.delta';
   delta: string;
-  item_id: string;
-  output_index: number;
-}
-
-/**
- * Function call arguments done event
- */
-export interface NordlysResponseFunctionCallArgumentsDoneEvent {
-  type: 'response.function_call_arguments.done';
   item_id: string;
   output_index: number;
 }

@@ -102,15 +102,19 @@ export function handleOutputItemAdded(
     }
     case 'function_call': {
       const toolCall = item as NordlysResponseFunctionToolCall;
-      if (!state.activeToolCalls.has(toolCall.id)) {
-        state.activeToolCalls.add(toolCall.id);
-        state.toolCallBuffers.set(toolCall.id, {
-          id: toolCall.id,
+      const toolCallId = toolCall.call_id;
+      // Buffer is keyed by item.id (what delta events use via item_id)
+      // but we track toolCallId (call_id) separately for event emission
+      const itemId = toolCall.id ?? toolCall.call_id;
+      if (!state.activeToolCalls.has(toolCallId)) {
+        state.activeToolCalls.add(toolCallId);
+        state.toolCallBuffers.set(itemId, {
+          id: toolCallId,
           name: toolCall.name,
           arguments: toolCall.arguments || '',
         });
         result.shouldEmitToolInputStart = true;
-        result.toolCallId = toolCall.id;
+        result.toolCallId = toolCallId;
         result.toolName = toolCall.name;
       }
       break;
@@ -164,76 +168,22 @@ export function handleReasoningDelta(
 
 /**
  * Handles function call arguments delta event
- * Returns the delta string and tool call info
+ * Returns the delta string
  */
 export function handleFunctionCallArgumentsDelta(
   event: NordlysResponseFunctionCallArgumentsDeltaEvent,
   state: NordlysStreamState
 ): {
   delta: string;
-  toolCallId: string;
-  currentArguments: string;
 } {
   const toolCall = state.toolCallBuffers.get(event.item_id);
-  if (!toolCall) {
-    // Tool call not initialized yet - this shouldn't happen but handle gracefully
-    return {
-      delta: event.delta,
-      toolCallId: event.item_id,
-      currentArguments: event.delta,
-    };
+  if (toolCall) {
+    // Mutate in place - Map stores references, so no need to set() again
+    toolCall.arguments += event.delta;
   }
-
-  toolCall.arguments += event.delta;
-  state.toolCallBuffers.set(event.item_id, toolCall);
 
   return {
     delta: event.delta,
-    toolCallId: event.item_id,
-    currentArguments: toolCall.arguments,
-  };
-}
-
-/**
- * Checks if a tool call is complete (has valid JSON arguments)
- */
-export function isToolCallComplete(
-  toolCallId: string,
-  state: NordlysStreamState
-): boolean {
-  const toolCall = state.toolCallBuffers.get(toolCallId);
-  if (!toolCall) {
-    return false;
-  }
-
-  try {
-    JSON.parse(toolCall.arguments);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Gets completed tool call info
- */
-export function getCompletedToolCall(
-  toolCallId: string,
-  state: NordlysStreamState
-): {
-  toolCallId: string;
-  toolName: string;
-  input: string;
-} | null {
-  const toolCall = state.toolCallBuffers.get(toolCallId);
-  if (!toolCall) {
-    return null;
-  }
-
-  return {
-    toolCallId: toolCall.id,
-    toolName: toolCall.name,
-    input: toolCall.arguments,
   };
 }
 

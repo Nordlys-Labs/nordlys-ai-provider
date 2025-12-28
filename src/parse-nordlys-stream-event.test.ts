@@ -9,14 +9,12 @@ import type {
 } from './nordlys-responses-types';
 import {
   createStreamState,
-  getCompletedToolCall,
   handleContentPartAdded,
   handleContentPartDone,
   handleFunctionCallArgumentsDelta,
   handleOutputItemAdded,
   handleReasoningDelta,
   handleTextDelta,
-  isToolCallComplete,
 } from './parse-nordlys-stream-event';
 
 describe('parseNordlysStreamEvent', () => {
@@ -114,7 +112,8 @@ describe('parseNordlysStreamEvent', () => {
         type: 'response.output_item.added',
         item: {
           type: 'function_call',
-          id: 'call-1',
+          call_id: 'call-1',
+          id: 'item-1',
           name: 'test_tool',
           arguments: '',
           status: 'in_progress',
@@ -175,7 +174,7 @@ describe('parseNordlysStreamEvent', () => {
   describe('handleFunctionCallArgumentsDelta', () => {
     it('should accumulate function call arguments', () => {
       const state = createStreamState();
-      state.toolCallBuffers.set('call-1', {
+      state.toolCallBuffers.set('item-1', {
         id: 'call-1',
         name: 'test_tool',
         arguments: '{"param":',
@@ -184,73 +183,16 @@ describe('parseNordlysStreamEvent', () => {
       const event: NordlysResponseFunctionCallArgumentsDeltaEvent = {
         type: 'response.function_call_arguments.delta',
         delta: ' "value"}',
-        item_id: 'call-1',
+        item_id: 'item-1',
         output_index: 0,
       };
 
       const result = handleFunctionCallArgumentsDelta(event, state);
 
       expect(result.delta).toBe(' "value"}');
-      expect(result.toolCallId).toBe('call-1');
-      expect(result.currentArguments).toBe('{"param": "value"}');
-      expect(state.toolCallBuffers.get('call-1')?.arguments).toBe(
+      expect(state.toolCallBuffers.get('item-1')?.arguments).toBe(
         '{"param": "value"}'
       );
-    });
-  });
-
-  describe('isToolCallComplete', () => {
-    it('should return true for valid JSON', () => {
-      const state = createStreamState();
-      state.toolCallBuffers.set('call-1', {
-        id: 'call-1',
-        name: 'test_tool',
-        arguments: '{"param": "value"}',
-      });
-
-      expect(isToolCallComplete('call-1', state)).toBe(true);
-    });
-
-    it('should return false for incomplete JSON', () => {
-      const state = createStreamState();
-      state.toolCallBuffers.set('call-1', {
-        id: 'call-1',
-        name: 'test_tool',
-        arguments: '{"param":',
-      });
-
-      expect(isToolCallComplete('call-1', state)).toBe(false);
-    });
-
-    it('should return false for non-existent tool call', () => {
-      const state = createStreamState();
-
-      expect(isToolCallComplete('call-1', state)).toBe(false);
-    });
-  });
-
-  describe('getCompletedToolCall', () => {
-    it('should return tool call info', () => {
-      const state = createStreamState();
-      state.toolCallBuffers.set('call-1', {
-        id: 'call-1',
-        name: 'test_tool',
-        arguments: '{"param": "value"}',
-      });
-
-      const result = getCompletedToolCall('call-1', state);
-
-      expect(result).toEqual({
-        toolCallId: 'call-1',
-        toolName: 'test_tool',
-        input: '{"param": "value"}',
-      });
-    });
-
-    it('should return null for non-existent tool call', () => {
-      const state = createStreamState();
-
-      expect(getCompletedToolCall('call-1', state)).toBeNull();
     });
   });
 

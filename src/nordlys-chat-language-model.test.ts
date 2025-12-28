@@ -382,4 +382,223 @@ describe('nordlysChatLanguageModel', () => {
       expect(Array.isArray(requestBody.input)).toBe(true);
     });
   });
+
+  describe('streaming with reasoning + tool calls + text', () => {
+    it('should properly handle reasoning ? tool calls ? text streaming sequence', async () => {
+      // Create a mock ReadableStream that emits events in sequence:
+      // 1. response.created
+      // 2. reasoning item added
+      // 3. reasoning deltas
+      // 4. function_call item added (should conclude reasoning)
+      // 5. function_call arguments delta
+      // 6. function_call arguments done
+      // 7. message item added (should emit text-start)
+      // 8. text deltas
+      // 9. message done
+      // 10. response.completed
+
+      const events = [
+        {
+          type: 'response.created',
+          response: {
+            id: 'resp-1',
+            model: 'test-model',
+            created_at: Date.now() / 1000,
+            status: 'in_progress',
+          },
+        },
+        {
+          type: 'response.output_item.added',
+          item: {
+            type: 'reasoning',
+            id: 'reasoning-1',
+            encrypted_content: null,
+          },
+          output_index: 0,
+        },
+        {
+          type: 'response.reasoning_text.delta',
+          item_id: 'reasoning-1',
+          delta: 'Thinking about the problem...',
+          output_index: 0,
+        },
+        {
+          type: 'response.reasoning_summary_part.done',
+          item_id: 'reasoning-1',
+          summary_index: 0,
+          output_index: 0,
+        },
+        {
+          type: 'response.output_item.added',
+          item: {
+            type: 'function_call',
+            id: 'item-1',
+            call_id: 'call-1',
+            name: 'test_tool',
+            arguments: '',
+          },
+          output_index: 1,
+        },
+        {
+          type: 'response.function_call_arguments.delta',
+          item_id: 'item-1',
+          delta: '{"param": "value"}',
+          output_index: 1,
+        },
+        {
+          type: 'response.output_item.done',
+          item: {
+            type: 'function_call',
+            id: 'item-1',
+            call_id: 'call-1',
+            name: 'test_tool',
+            arguments: '{"param": "value"}',
+          },
+          output_index: 1,
+        },
+        {
+          type: 'response.output_item.added',
+          item: {
+            type: 'message',
+            id: 'msg-1',
+            role: 'assistant',
+            content: [],
+          },
+          output_index: 2,
+        },
+        {
+          type: 'response.output_text.delta',
+          item_id: 'msg-1',
+          delta: 'Hello',
+          output_index: 2,
+          content_index: 0,
+        },
+        {
+          type: 'response.output_text.delta',
+          item_id: 'msg-1',
+          delta: ' world',
+          output_index: 2,
+          content_index: 0,
+        },
+        {
+          type: 'response.output_item.done',
+          item: {
+            type: 'message',
+            id: 'msg-1',
+            role: 'assistant',
+            status: 'completed',
+          },
+          output_index: 2,
+        },
+        {
+          type: 'response.output_item.done',
+          item: {
+            type: 'reasoning',
+            id: 'reasoning-1',
+            status: 'completed',
+          },
+          output_index: 0,
+        },
+        {
+          type: 'response.completed',
+          response: {
+            id: 'resp-1',
+            model: 'test-model',
+            created_at: Date.now() / 1000,
+            status: 'completed',
+            usage: {
+              input_tokens: 10,
+              output_tokens: 20,
+              total_tokens: 30,
+            },
+          },
+        },
+      ];
+
+      // Create a ReadableStream that emits SSE-formatted events
+      const stream = new ReadableStream({
+        start(controller) {
+          const encoder = new TextEncoder();
+          for (const event of events) {
+            const line = `data: ${JSON.stringify(event)}\n\n`;
+            controller.enqueue(encoder.encode(line));
+          }
+          controller.close();
+        },
+      });
+
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers({
+          'content-type': 'text/event-stream',
+        }),
+        body: stream,
+        bodyUsed: false,
+        url: 'https://example.com',
+        redirected: false,
+        type: 'basic' as ResponseType,
+        clone: () => ({}) as Response,
+      });
+
+      const model = new NordlysChatLanguageModel('test-model', undefined, {
+        provider: 'nordlys.chat',
+        baseURL: 'https://example.com',
+        headers: () => ({}),
+        fetch: mockFetch,
+      });
+
+      const result = await model.doStream({
+        prompt: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
+      });
+
+      // Collect all stream parts
+      const streamParts: Array<{ type: string }> = [];
+      const reader = result.stream.getReader();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          streamParts.push(value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      // Verify the sequence of events
+      // Should have: stream-start, reasoning-start, reasoning-delta, reasoning-end (before tool),
+      // tool-input-start, tool-input-delta, tool-input-end, tool-call, text-start, text-delta, text-end, finish
+
+      const eventTypes = streamParts.map((p) => p.type);
+
+      // Verify reasoning was concluded before tool calls
+      const reasoningEndIndex = eventTypes.indexOf('reasoning-end');
+      const toolInputStartIndex = eventTypes.indexOf('tool-input-start');
+      expect(reasoningEndIndex).toBeGreaterThanOrEqual(0);
+      expect(toolInputStartIndex).toBeGreaterThanOrEqual(0);
+      expect(reasoningEndIndex).toBeLessThan(toolInputStartIndex);
+
+      // Verify text-start was emitted after tool calls
+      const toolCallIndex = eventTypes.indexOf('tool-call');
+      const textStartIndex = eventTypes.indexOf('text-start');
+      expect(toolCallIndex).toBeGreaterThanOrEqual(0);
+      expect(textStartIndex).toBeGreaterThanOrEqual(0);
+      expect(textStartIndex).toBeGreaterThan(toolCallIndex);
+
+      // Verify text deltas continue after text-start
+      const textDeltaIndices = eventTypes
+        .map((type, idx) => (type === 'text-delta' ? idx : -1))
+        .filter((idx) => idx >= 0);
+      expect(textDeltaIndices.length).toBeGreaterThan(0);
+      expect(textDeltaIndices[0]).toBeGreaterThan(textStartIndex);
+
+      // Verify text-end was emitted
+      expect(eventTypes).toContain('text-end');
+
+      // Verify finish event was emitted
+      expect(eventTypes).toContain('finish');
+    });
+  });
 });
