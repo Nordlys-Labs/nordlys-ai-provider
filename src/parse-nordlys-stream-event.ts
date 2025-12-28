@@ -275,11 +275,12 @@ export function handleContentPartAdded(
 
   switch (part.type) {
     case 'output_text': {
-      // Ensure text item is active
+      // Ensure text item is active (but don't emit text-start here)
+      // text-start should have already been emitted by output_item.added
       if (!state.activeTextItems.has(itemId)) {
         state.activeTextItems.add(itemId);
         state.textBuffers.set(itemId, '');
-        result.shouldEmitTextStart = true;
+        // Don't emit text-start here - it should come from output_item.added
       }
 
       // Update buffer and emit delta
@@ -311,10 +312,12 @@ export function handleContentPartAdded(
     }
     case 'refusal': {
       // Handle refusal as text content
+      // Ensure text item is active (but don't emit text-start here)
+      // text-start should have already been emitted by output_item.added
       if (!state.activeTextItems.has(itemId)) {
         state.activeTextItems.add(itemId);
         state.textBuffers.set(itemId, '');
-        result.shouldEmitTextStart = true;
+        // Don't emit text-start here - it should come from output_item.added
       }
 
       // Update buffer and emit delta
@@ -369,13 +372,8 @@ export function handleContentPartDone(
         state.textBuffers.set(itemId, updated);
       }
 
-      // Mark text item as done
-      if (state.activeTextItems.has(itemId)) {
-        result.shouldEmitTextEnd = true;
-        result.itemId = itemId;
-        // Note: We don't remove from activeTextItems here as it might be used
-        // for multiple content parts. The flush handler will clean up.
-      }
+      // Don't emit text-end here - it should be emitted by output_item.done
+      // We just update the buffer and let output_item.done handle the text-end emission
       break;
     }
     case 'reasoning_text': {
@@ -401,11 +399,8 @@ export function handleContentPartDone(
         state.textBuffers.set(itemId, updated);
       }
 
-      // Mark text item as done
-      if (state.activeTextItems.has(itemId)) {
-        result.shouldEmitTextEnd = true;
-        result.itemId = itemId;
-      }
+      // Don't emit text-end here - it should be emitted by output_item.done
+      // We just update the buffer and let output_item.done handle the text-end emission
       break;
     }
   }

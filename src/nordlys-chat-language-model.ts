@@ -1022,13 +1022,8 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
             } else if (value.type === 'response.content_part.added') {
               const result = handleContentPartAdded(value, streamParseState);
 
-              if (result.shouldEmitTextStart && result.itemId) {
-                controller.enqueue({
-                  type: 'text-start',
-                  id: result.itemId,
-                });
-              }
-
+              // Only emit text-delta for content parts
+              // text-start should have already been emitted by output_item.added
               if (
                 result.shouldEmitTextDelta &&
                 result.textDelta &&
@@ -1055,15 +1050,8 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
             } else if (value.type === 'response.content_part.done') {
               const result = handleContentPartDone(value, streamParseState);
 
-              if (result.shouldEmitTextEnd && result.itemId) {
-                controller.enqueue({
-                  type: 'text-end',
-                  id: result.itemId,
-                });
-                // Remove from activeTextItems to prevent duplicate text-end in flush
-                streamParseState.activeTextItems.delete(result.itemId);
-              }
-
+              // Only handle buffer updates and delta handling
+              // text-end should be emitted by output_item.done
               if (result.shouldEmitReasoningEnd && result.reasoningItemId) {
                 streamParseState.activeReasoningItems.delete(
                   result.reasoningItemId

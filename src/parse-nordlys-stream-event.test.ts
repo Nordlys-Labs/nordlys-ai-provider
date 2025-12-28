@@ -249,7 +249,8 @@ describe('parseNordlysStreamEvent', () => {
 
       const result = handleContentPartAdded(event, state);
 
-      expect(result.shouldEmitTextStart).toBe(true);
+      // text-start should NOT be emitted here - it should come from output_item.added
+      expect(result.shouldEmitTextStart).toBe(false);
       expect(result.shouldEmitTextDelta).toBe(true);
       expect(result.textDelta).toBe('Hello');
       expect(result.itemId).toBe('msg-1');
@@ -296,7 +297,8 @@ describe('parseNordlysStreamEvent', () => {
 
       const result = handleContentPartAdded(event, state);
 
-      expect(result.shouldEmitTextStart).toBe(true);
+      // text-start should NOT be emitted here - it should come from output_item.added
+      expect(result.shouldEmitTextStart).toBe(false);
       expect(result.shouldEmitTextDelta).toBe(true);
       expect(result.textDelta).toBe('I cannot do that');
       expect(result.itemId).toBe('msg-1');
@@ -350,8 +352,9 @@ describe('parseNordlysStreamEvent', () => {
 
       const result = handleContentPartDone(event, state);
 
-      expect(result.shouldEmitTextEnd).toBe(true);
-      expect(result.itemId).toBe('msg-1');
+      // text-end should NOT be emitted here - it should come from output_item.done
+      expect(result.shouldEmitTextEnd).toBe(false);
+      // Buffer should still be updated
       expect(state.textBuffers.get('msg-1')).toBe('Hello world');
     });
 
@@ -398,8 +401,9 @@ describe('parseNordlysStreamEvent', () => {
 
       const result = handleContentPartDone(event, state);
 
-      expect(result.shouldEmitTextEnd).toBe(true);
-      expect(result.itemId).toBe('msg-1');
+      // text-end should NOT be emitted here - it should come from output_item.done
+      expect(result.shouldEmitTextEnd).toBe(false);
+      // Buffer should still be updated
       expect(state.textBuffers.get('msg-1')).toBe('I cannot do that');
     });
 
