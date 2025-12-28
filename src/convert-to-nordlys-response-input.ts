@@ -11,7 +11,41 @@ import type {
   NordlysResponseInputItemUnion,
 } from './nordlys-responses-types';
 
-// Convert tool output to string
+// Constants
+const OPENAI_FILE_ID_PREFIX = 'file-' as const;
+const DEFAULT_IMAGE_MEDIA_TYPE = 'image/jpeg' as const;
+const DEFAULT_PDF_FILENAME = 'document.pdf' as const;
+
+const AUDIO_MEDIA_TYPES = ['audio/wav', 'audio/mp3', 'audio/mpeg'] as const;
+const PDF_MEDIA_TYPE = 'application/pdf' as const;
+
+type AudioMediaType = (typeof AUDIO_MEDIA_TYPES)[number];
+
+// Pre-compute Set for O(1) lookup performance
+const AUDIO_MEDIA_TYPES_SET = new Set<string>(AUDIO_MEDIA_TYPES);
+
+/**
+ * Checks if a media type is a supported audio format.
+ * Uses a pre-computed Set for O(1) lookup performance instead of array includes.
+ *
+ * @param mediaType - The media type string to check, or undefined
+ * @returns True if the media type is a supported audio format, false otherwise
+ */
+function isAudioMediaType(
+  mediaType: string | undefined
+): mediaType is AudioMediaType {
+  if (mediaType === undefined) {
+    return false;
+  }
+  return AUDIO_MEDIA_TYPES_SET.has(mediaType);
+}
+
+/**
+ * Converts tool output to string representation.
+ *
+ * @param output - The tool result output to convert
+ * @returns String representation of the tool output
+ */
 function convertToolOutput(
   output: LanguageModelV3ToolResultPart['output']
 ): string {
@@ -31,8 +65,69 @@ function convertToolOutput(
 }
 
 /**
- * Converts AI SDK prompt to Nordlys Responses API input format
- * Returns input and instructions separately (system messages go to instructions)
+ * Checks if a string is an OpenAI file ID.
+ * OpenAI file IDs typically start with "file-"
+ *
+ * @param data - The string to check
+ * @returns True if the string appears to be an OpenAI file ID, false otherwise
+ */
+function isFileId(data: string): boolean {
+  return data.startsWith(OPENAI_FILE_ID_PREFIX);
+}
+
+/**
+ * Builds instructions from system messages.
+ * Returns a string if there's a single message, an array of system message objects
+ * if there are multiple, or undefined if there are no system messages.
+ *
+ * @param systemMessages - Array of system message strings
+ * @returns Instructions as string, array of system message objects, or undefined
+ */
+function buildInstructions(
+  systemMessages: string[]
+): string | NordlysResponseInputItemUnion[] | undefined {
+  if (systemMessages.length === 0) {
+    return undefined;
+  }
+  if (systemMessages.length === 1) {
+    return systemMessages[0];
+  }
+  return systemMessages.map((msg) => ({
+    role: 'system' as const,
+    content: msg,
+  }));
+}
+
+/**
+ * Converts AI SDK LanguageModelV3Prompt to Nordlys Responses API input format.
+ *
+ * This function transforms the AI SDK's standardized prompt format into the
+ * format expected by the Nordlys Responses API. Key transformations include:
+ * - System messages are extracted to the `instructions` field
+ * - User messages are converted to input items with proper content types
+ * - Images support both `image_url` and `file_id` (mutually exclusive)
+ * - Audio files are converted to separate input items
+ * - PDF files are converted to file input content
+ * - Assistant messages are converted to user messages with warnings
+ * - Tool results are converted to function call outputs
+ *
+ * @param options - Configuration options
+ * @param options.prompt - The AI SDK LanguageModelV3Prompt to convert
+ * @returns An object containing:
+ *   - `input`: The converted input (string for simple text prompts, array for complex prompts)
+ *   - `instructions`: Optional instructions from system messages (string or array)
+ *   - `warnings`: Array of warnings about unsupported features or conversions
+ *
+ * @example
+ * ```typescript
+ * const result = convertToNordlysResponseInput({
+ *   prompt: [
+ *     { role: 'system', content: 'You are a helpful assistant.' },
+ *     { role: 'user', content: [{ type: 'text', text: 'Hello' }] }
+ *   ]
+ * });
+ * // Returns: { input: 'Hello', instructions: 'You are a helpful assistant.', warnings: [] }
+ * ```
  */
 export function convertToNordlysResponseInput({
   prompt,
@@ -41,9 +136,9 @@ export function convertToNordlysResponseInput({
 }): {
   input: string | NordlysResponseInputItemUnion[];
   instructions?: string | NordlysResponseInputItemUnion[];
-  warnings: Array<SharedV3Warning>;
+  warnings: SharedV3Warning[];
 } {
-  const warnings: Array<SharedV3Warning> = [];
+  const warnings: SharedV3Warning[] = [];
   const inputItems: NordlysResponseInputItemUnion[] = [];
   const systemMessages: string[] = [];
 
@@ -51,6 +146,7 @@ export function convertToNordlysResponseInput({
   const hasOnlySingleUserText =
     prompt.length === 1 &&
     prompt[0].role === 'user' &&
+    Array.isArray(prompt[0].content) &&
     prompt[0].content.length === 1 &&
     prompt[0].content[0].type === 'text';
 
@@ -85,84 +181,88 @@ export function convertToNordlysResponseInput({
               }
               case 'file': {
                 // Validate data exists
-                if (part.data === undefined || part.data === null) {
+                if (part.data == null) {
                   throw new Error(
                     'File part data is required but was undefined or null'
                   );
                 }
 
-                // Handle images
-                if (part.mediaType?.startsWith('image/')) {
-                  const mediaType =
-                    part.mediaType === 'image/*'
-                      ? 'image/jpeg'
-                      : part.mediaType;
-                  const url =
-                    part.data instanceof URL
-                      ? part.data.toString()
-                      : `data:${mediaType};base64,${convertToBase64(part.data)}`;
+                const { mediaType, data } = part;
 
-                  contentParts.push({
-                    type: 'input_image',
-                    image_url: url,
-                  });
+                // Handle images
+                if (mediaType?.startsWith('image/')) {
+                  const normalizedMediaType =
+                    mediaType === 'image/*'
+                      ? DEFAULT_IMAGE_MEDIA_TYPE
+                      : mediaType;
+
+                  // Use conditional spread to ensure only one of image_url or file_id is present
+                  const imageContent: NordlysResponseInputContentUnion =
+                    data instanceof URL
+                      ? {
+                          type: 'input_image',
+                          image_url: data.toString(),
+                        }
+                      : typeof data === 'string' && isFileId(data)
+                        ? {
+                            type: 'input_image',
+                            file_id: data,
+                          }
+                        : {
+                            type: 'input_image',
+                            image_url: `data:${normalizedMediaType};base64,${convertToBase64(data)}`,
+                          };
+
+                  contentParts.push(imageContent);
                   break;
                 }
 
                 // Handle audio files
-                if (
-                  part.mediaType &&
-                  (part.mediaType === 'audio/wav' ||
-                    part.mediaType === 'audio/mp3' ||
-                    part.mediaType === 'audio/mpeg')
-                ) {
-                  if (part.data instanceof URL) {
+                if (isAudioMediaType(mediaType)) {
+                  if (data instanceof URL) {
                     throw new UnsupportedFunctionalityError({
                       functionality: 'audio file parts with URLs',
                     });
                   }
 
-                  const data =
-                    typeof part.data === 'string'
-                      ? part.data
-                      : convertToBase64(part.data);
+                  const audioData =
+                    typeof data === 'string' ? data : convertToBase64(data);
+                  // Map audio media types to format: wav -> wav, mp3/mpeg -> mp3
+                  const audioFormat: 'wav' | 'mp3' =
+                    mediaType === 'audio/wav' ? 'wav' : 'mp3';
 
                   // Audio is a separate input item, not content
                   inputItems.push({
                     type: 'input_audio',
                     input_audio: {
-                      data,
-                      format: (part.mediaType === 'audio/wav'
-                        ? 'wav'
-                        : 'mp3') as 'wav' | 'mp3',
+                      data: audioData,
+                      format: audioFormat,
                     },
                   });
                   break;
                 }
 
                 // Handle PDF files
-                if (part.mediaType && part.mediaType === 'application/pdf') {
-                  if (part.data instanceof URL) {
+                if (mediaType === PDF_MEDIA_TYPE) {
+                  if (data instanceof URL) {
                     throw new UnsupportedFunctionalityError({
                       functionality: 'PDF file parts with URLs',
                     });
                   }
 
                   const base64Data =
-                    typeof part.data === 'string'
-                      ? part.data
-                      : convertToBase64(part.data);
+                    typeof data === 'string' ? data : convertToBase64(data);
 
                   contentParts.push({
                     type: 'input_file',
-                    filename: part.filename ?? 'document.pdf',
-                    file_data: `data:application/pdf;base64,${base64Data}`,
+                    filename: part.filename ?? DEFAULT_PDF_FILENAME,
+                    file_data: `data:${PDF_MEDIA_TYPE};base64,${base64Data}`,
                   });
                   break;
                 }
 
                 throw new UnsupportedFunctionalityError({
-                  functionality: `file part media type ${part.mediaType}`,
+                  functionality: `file part media type ${mediaType ?? 'unknown'}`,
                 });
               }
               default: {
@@ -253,43 +353,41 @@ export function convertToNordlysResponseInput({
   // Determine return format
   // If we have a simple single text prompt, return as string
   if (hasOnlySingleUserText) {
-    const textInput = (prompt[0].content[0] as { text: string }).text;
+    const firstPromptItem = prompt[0];
+    // TypeScript knows content is an array due to hasOnlySingleUserText check
+    // but we need to assert it for type narrowing
+    if (!Array.isArray(firstPromptItem.content)) {
+      throw new Error('Expected array content but got string');
+    }
+    const firstContent = firstPromptItem.content[0];
+    // Type guard ensures type safety
+    if (firstContent.type !== 'text') {
+      // This should never happen due to hasOnlySingleUserText check, but TypeScript needs it
+      throw new Error('Expected text content but got different type');
+    }
     return {
-      input: textInput,
+      input: firstContent.text,
       instructions: undefined,
       warnings,
     };
   }
+
+  // Build instructions from system messages
+  const instructions = buildInstructions(systemMessages);
 
   // Return as array (must have at least one item or be a string)
   if (inputItems.length === 0) {
     // No input items - this shouldn't happen but handle gracefully
     return {
       input: '',
-      instructions:
-        systemMessages.length > 0
-          ? systemMessages.length === 1
-            ? systemMessages[0]
-            : systemMessages.map((msg) => ({
-                role: 'system' as const,
-                content: msg,
-              }))
-          : undefined,
+      instructions,
       warnings,
     };
   }
 
   return {
     input: inputItems,
-    instructions:
-      systemMessages.length > 0
-        ? systemMessages.length === 1
-          ? systemMessages[0]
-          : systemMessages.map((msg) => ({
-              role: 'system' as const,
-              content: msg,
-            }))
-        : undefined,
+    instructions,
     warnings,
   };
 }
