@@ -466,6 +466,7 @@ export type NordlysResponseStreamEventUnion =
   | NordlysResponseOutputTextDoneEvent
   | NordlysResponseReasoningTextDeltaEvent
   | NordlysResponseFunctionCallArgumentsDeltaEvent
+  | NordlysResponseFunctionCallArgumentsDoneEvent
   | NordlysResponseContentPartAddedEvent
   | NordlysResponseContentPartDoneEvent
   | NordlysResponseReasoningSummaryPartAddedEvent
@@ -578,6 +579,18 @@ export interface NordlysResponseFunctionCallArgumentsDeltaEvent {
   delta: string;
   item_id: string;
   output_index: number;
+}
+
+/**
+ * Function call arguments done event
+ */
+export interface NordlysResponseFunctionCallArgumentsDoneEvent {
+  type: 'response.function_call_arguments.done';
+  item_id: string;
+  output_index: number;
+  arguments?: string;
+  model?: string;
+  sequence_number?: number;
 }
 
 /**

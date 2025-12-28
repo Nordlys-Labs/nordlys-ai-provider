@@ -182,6 +182,14 @@ const nordlysResponseStreamEventSchema = z.union([
     output_index: z.number(),
   }),
   z.object({
+    type: z.literal('response.function_call_arguments.done'),
+    item_id: z.string(),
+    output_index: z.number(),
+    arguments: z.string().optional(),
+    model: z.string().optional(),
+    sequence_number: z.number().optional(),
+  }),
+  z.object({
     type: z.literal('response.content_part.added'),
     content_index: z.number(),
     item_id: z.string(),
@@ -885,6 +893,10 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
                   delta: value.delta,
                 });
               }
+            } else if (isResponseFunctionCallArgumentsDoneChunk(value)) {
+              // This event can be safely ignored since we already handle function calls
+              // via output_item.done events. This maintains backward compatibility with
+              // the API format.
             } else if (isResponseCreatedChunk(value)) {
               responseId = value.response.id;
               controller.enqueue({
@@ -1159,6 +1171,14 @@ function isResponseFunctionCallArgumentsDeltaChunk(
   type: 'response.function_call_arguments.delta';
 } {
   return chunk.type === 'response.function_call_arguments.delta';
+}
+
+function isResponseFunctionCallArgumentsDoneChunk(
+  chunk: NordlysResponseStreamEventUnion
+): chunk is NordlysResponseStreamEventUnion & {
+  type: 'response.function_call_arguments.done';
+} {
+  return chunk.type === 'response.function_call_arguments.done';
 }
 
 function isResponseOutputItemAddedChunk(

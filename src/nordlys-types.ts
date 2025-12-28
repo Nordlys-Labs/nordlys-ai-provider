@@ -11,6 +11,7 @@ export type {
   NordlysResponseErrorEvent,
   NordlysResponseFileSearchToolCall,
   NordlysResponseFunctionCallArgumentsDeltaEvent,
+  NordlysResponseFunctionCallArgumentsDoneEvent,
   NordlysResponseFunctionToolCall,
   NordlysResponseFunctionWebSearch,
   NordlysResponseInProgressEvent,
