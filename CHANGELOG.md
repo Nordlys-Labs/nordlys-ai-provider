@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.3
+
+### Patch Changes
+
+- 7902170: extract tool-calls from assistant messages as function_call items
+
 ## 1.2.2
 
 ### Patch Changes
