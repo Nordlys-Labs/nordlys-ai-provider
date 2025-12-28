@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.14
+
+### Patch Changes
+
+- 923ab7c: align Responses API types with OpenAI format
+
 ## 1.1.13
 
 ### Patch Changes
