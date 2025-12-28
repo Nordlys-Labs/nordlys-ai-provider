@@ -116,12 +116,13 @@ describe('convertToNordlysResponseInput', () => {
     expect(Array.isArray(result.input)).toBe(true);
   });
 
-  it('should handle empty input gracefully', () => {
-    const result = convertToNordlysResponseInput({
-      prompt: [{ role: 'system', content: 'System message' }],
-    });
-
-    expect(result.input).toBe('');
-    expect(result.instructions).toBe('System message');
+  it('should throw error when there is no input', () => {
+    expect(() => {
+      convertToNordlysResponseInput({
+        prompt: [{ role: 'system', content: 'System message' }],
+      });
+    }).toThrow(
+      'Cannot generate request: no valid input items found. At least one input item (user message, system message, etc.) is required.'
+    );
   });
 });
