@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0
+
+### Minor Changes
+
+- 6a62fe7: update TypeScript types to match Go SDK format
+
 ## 1.1.15
 
 ### Patch Changes
