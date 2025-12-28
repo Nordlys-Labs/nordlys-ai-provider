@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2
+
+### Patch Changes
+
+- 3af3ab7: add back function_call_arguments.done event type
+
 ## 1.2.1
 
 ### Patch Changes
