@@ -1022,8 +1022,20 @@ export class NordlysChatLanguageModel implements LanguageModelV3 {
             } else if (value.type === 'response.content_part.added') {
               const result = handleContentPartAdded(value, streamParseState);
 
-              // Only emit text-delta for content parts
-              // text-start should have already been emitted by output_item.added
+              // Emit text-start if needed (defensive check for race conditions)
+              if (result.shouldEmitTextStart && result.itemId) {
+                controller.enqueue({
+                  type: 'text-start',
+                  id: result.itemId,
+                  providerMetadata: {
+                    [providerKey]: {
+                      itemId: value.item_id,
+                    },
+                  },
+                });
+              }
+
+              // Emit text-delta for content parts
               if (
                 result.shouldEmitTextDelta &&
                 result.textDelta &&

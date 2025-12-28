@@ -80,11 +80,9 @@ export function handleOutputItemAdded(
   switch (item.type) {
     case 'message': {
       const message = item as NordlysResponseOutputMessage;
-      // Check if message has text content
-      const hasText = message.content.some(
-        (c) => c.type === 'output_text' || c.type === 'refusal'
-      );
-      if (hasText && !state.activeTextItems.has(message.id)) {
+      // Always emit text-start for message items (like OpenAI)
+      // This ensures text-start is emitted even if message arrives with empty content
+      if (!state.activeTextItems.has(message.id)) {
         state.activeTextItems.add(message.id);
         state.textBuffers.set(message.id, '');
         result.shouldEmitTextStart = true;
@@ -275,12 +273,13 @@ export function handleContentPartAdded(
 
   switch (part.type) {
     case 'output_text': {
-      // Ensure text item is active (but don't emit text-start here)
-      // text-start should have already been emitted by output_item.added
-      if (!state.activeTextItems.has(itemId)) {
+      // Ensure text item is active
+      // If not active, emit text-start first (defensive check for race conditions)
+      const wasNotActive = !state.activeTextItems.has(itemId);
+      if (wasNotActive) {
         state.activeTextItems.add(itemId);
         state.textBuffers.set(itemId, '');
-        // Don't emit text-start here - it should come from output_item.added
+        result.shouldEmitTextStart = true;
       }
 
       // Update buffer and emit delta
@@ -312,12 +311,13 @@ export function handleContentPartAdded(
     }
     case 'refusal': {
       // Handle refusal as text content
-      // Ensure text item is active (but don't emit text-start here)
-      // text-start should have already been emitted by output_item.added
-      if (!state.activeTextItems.has(itemId)) {
+      // Ensure text item is active
+      // If not active, emit text-start first (defensive check for race conditions)
+      const wasNotActive = !state.activeTextItems.has(itemId);
+      if (wasNotActive) {
         state.activeTextItems.add(itemId);
         state.textBuffers.set(itemId, '');
-        // Don't emit text-start here - it should come from output_item.added
+        result.shouldEmitTextStart = true;
       }
 
       // Update buffer and emit delta

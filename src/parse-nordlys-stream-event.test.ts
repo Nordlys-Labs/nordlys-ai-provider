@@ -60,6 +60,28 @@ describe('parseNordlysStreamEvent', () => {
       expect(state.activeTextItems.has('msg-1')).toBe(true);
     });
 
+    it('should handle message output item with empty content', () => {
+      const state = createStreamState();
+      const event: NordlysResponseOutputItemAddedEvent = {
+        type: 'response.output_item.added',
+        item: {
+          type: 'message',
+          id: 'msg-1',
+          role: 'assistant',
+          status: 'in_progress',
+          content: [],
+        },
+        output_index: 0,
+      };
+
+      const result = handleOutputItemAdded(event, state);
+
+      // Should always emit text-start for message items, even with empty content
+      expect(result.shouldEmitTextStart).toBe(true);
+      expect(result.textItemId).toBe('msg-1');
+      expect(state.activeTextItems.has('msg-1')).toBe(true);
+    });
+
     it('should handle reasoning output item', () => {
       const state = createStreamState();
       const event: NordlysResponseOutputItemAddedEvent = {
@@ -249,8 +271,8 @@ describe('parseNordlysStreamEvent', () => {
 
       const result = handleContentPartAdded(event, state);
 
-      // text-start should NOT be emitted here - it should come from output_item.added
-      expect(result.shouldEmitTextStart).toBe(false);
+      // text-start should be emitted defensively if item is not active (race condition handling)
+      expect(result.shouldEmitTextStart).toBe(true);
       expect(result.shouldEmitTextDelta).toBe(true);
       expect(result.textDelta).toBe('Hello');
       expect(result.itemId).toBe('msg-1');
@@ -297,8 +319,8 @@ describe('parseNordlysStreamEvent', () => {
 
       const result = handleContentPartAdded(event, state);
 
-      // text-start should NOT be emitted here - it should come from output_item.added
-      expect(result.shouldEmitTextStart).toBe(false);
+      // text-start should be emitted defensively if item is not active (race condition handling)
+      expect(result.shouldEmitTextStart).toBe(true);
       expect(result.shouldEmitTextDelta).toBe(true);
       expect(result.textDelta).toBe('I cannot do that');
       expect(result.itemId).toBe('msg-1');
