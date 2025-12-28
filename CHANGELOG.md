@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.13
+
+### Patch Changes
+
+- ad0b59b: always emit text-start for message items to prevent 'text part not found' error
+
 ## 1.1.12
 
 ### Patch Changes
